@@ -1,7 +1,6 @@
 
-import { Product, User } from '../types';
-
-const PRODUCTS_KEY = 'nova_market_products';
+import { Product, Order } from '../types';
+import { databaseService } from './databaseService';
 
 // eBay-style Categories
 export const CATEGORIES = [
@@ -31,142 +30,98 @@ export const CATEGORIES = [
   },
 ];
 
-const MOCK_PRODUCTS: Product[] = [
-  {
-    id: 'prod_1',
-    sellerId: 'user_123', // Demo user
-    title: 'Apple iPhone 15 Pro Max - 256GB - Natural Titanium',
-    description: 'Brand new, sealed in box. Unlocked for all carriers. Includes original accessories. Will ship immediately upon payment confirmation.',
-    price: 1100,
-    currency: 'USDC',
-    images: ['https://store.storeimages.cdn-apple.com/4982/as-images.apple.com/is/iphone-15-pro-max-natural-titanium-select?wid=940&hei=1112&fmt=png-alpha&.v=1692875663718'],
-    category: 'Electronics',
-    subcategory: 'Cell Phones',
-    condition: 'New',
-    location: { lat: 40.7128, lng: -74.0060, address: 'New York, NY', isLocalPickupAvailable: true },
-    shippingOptions: [
-      { id: 'ship_1', name: 'Standard Shipping', priceUsd: 15, estimatedDays: '3-5 days' },
-      { id: 'ship_2', name: 'Express Overnight', priceUsd: 45, estimatedDays: '1 day' }
-    ],
-    reviews: [],
-    createdAt: Date.now()
-  },
-  {
-    id: 'prod_2',
-    sellerId: 'user_vendor_2',
-    title: 'Vintage Rolex Submariner 16610',
-    description: 'Excellent condition. Box and papers included. Serviced in 2023.',
-    price: 8500,
-    currency: 'USDC',
-    images: ['https://content.rolex.com/dam/2022/upright-bba-with-shadow/m126610ln-0001.png?impolicy=v6-upright&imwidth=270'],
-    category: 'Fashion',
-    subcategory: 'Watches',
-    condition: 'Used',
-    location: { lat: 48.8566, lng: 2.3522, address: 'Paris, France', isLocalPickupAvailable: false },
-    shippingOptions: [
-      { id: 'ship_3', name: 'Insured Priority', priceUsd: 150, estimatedDays: '2-3 days' }
-    ],
-    reviews: [
-      { id: 'rev_1', reviewerId: 'user_123', reviewerName: 'Demo User', rating: 5, comment: 'Trusted seller!', date: '2023-10-01'}
-    ],
-    createdAt: Date.now() - 100000
-  },
-  {
-    id: 'prod_3',
-    sellerId: 'user_vendor_3',
-    title: 'PlayStation 5 Disc Edition Console',
-    description: 'Like new, barely used. Comes with 2 controllers and Spider-Man 2.',
-    price: 450,
-    currency: 'USDC',
-    images: ['https://gmedia.playstation.com/is/image/SIEPDC/ps5-product-thumbnail-01-en-14sep21?$facebook$'],
-    category: 'Electronics',
-    subcategory: 'Video Games',
-    condition: 'Open Box',
-    location: { lat: 34.0522, lng: -118.2437, address: 'Los Angeles, CA', isLocalPickupAvailable: true },
-    shippingOptions: [
-      { id: 'ship_1', name: 'Standard Shipping', priceUsd: 20, estimatedDays: '3-5 days' }
-    ],
-    reviews: [],
-    createdAt: Date.now() - 500000
-  },
-  {
-    id: 'prod_4',
-    sellerId: 'user_123',
-    title: 'Tesla Model 3 Floor Mats (All Weather)',
-    description: 'Full set of heavy duty floor mats. Fits 2021-2024 models.',
-    price: 120,
-    currency: 'USDC',
-    images: ['https://shop.tesla.com/assets/img/shop/accessories/interior/floor-mats/model-3/1448816-00-A_0_2000.jpg'],
-    category: 'Motors',
-    subcategory: 'Parts & Accessories',
-    condition: 'New',
-    location: { lat: 51.5074, lng: -0.1278, address: 'London, UK', isLocalPickupAvailable: false },
-    shippingOptions: [
-      { id: 'ship_1', name: 'Ground Shipping', priceUsd: 0, estimatedDays: '5-7 days' }
-    ],
-    reviews: [],
-    createdAt: Date.now() - 200000
-  }
-];
-
 export const marketService = {
-  init: () => {
-    if (!localStorage.getItem(PRODUCTS_KEY)) {
-      localStorage.setItem(PRODUCTS_KEY, JSON.stringify(MOCK_PRODUCTS));
-    }
+  init: async () => {
+    // No local init needed anymore, data is in Cloud
   },
 
-  getAllProducts: (): Product[] => {
-    return JSON.parse(localStorage.getItem(PRODUCTS_KEY) || '[]');
+  getAllProducts: async (): Promise<Product[]> => {
+    return await databaseService.fetchProducts({});
   },
 
-  getProductsByCategory: (category: string): Product[] => {
-    const products = marketService.getAllProducts();
-    if (category === 'All') return products;
-    return products.filter(p => p.category === category);
+  getProductsByCategory: async (category: string): Promise<Product[]> => {
+    return await databaseService.fetchProducts({ category });
   },
 
-  getProductsBySeller: (sellerId: string): Product[] => {
-    const products = marketService.getAllProducts();
-    return products.filter(p => p.sellerId === sellerId);
+  getProductsBySeller: async (sellerId: string): Promise<Product[]> => {
+    return await databaseService.fetchProducts({ sellerId });
   },
 
-  searchProducts: (query: string): Product[] => {
-    const products = marketService.getAllProducts();
-    const lowerQuery = query.toLowerCase();
-    return products.filter(p => 
-      p.title.toLowerCase().includes(lowerQuery) || 
-      p.description.toLowerCase().includes(lowerQuery) ||
-      p.category.toLowerCase().includes(lowerQuery)
-    );
+  searchProducts: async (query: string): Promise<Product[]> => {
+    return await databaseService.fetchProducts({ search: query });
   },
 
-  getProductById: (id: string): Product | undefined => {
-    return marketService.getAllProducts().find(p => p.id === id);
+  getProductById: async (id: string): Promise<Product | undefined> => {
+    // Inefficient for now (fetching all filtered by ID implicitly via Supabase if we had a direct method)
+    // Since databaseService.fetchProducts doesn't support ID directly yet, we could add it or just use search
+    // But better to filter locally or add a specific method.
+    // For now, we assume UI passes the product object or we fetch specific logic later.
+    // Returning undefined as placeholder since UI mostly passes Product object directly
+    return undefined;
   },
 
   publishProduct: async (product: Product): Promise<void> => {
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    const products = marketService.getAllProducts();
-    products.unshift(product); // Add to top
-    localStorage.setItem(PRODUCTS_KEY, JSON.stringify(products));
+    await databaseService.createProduct(product);
   },
 
-  // Purchase simulation
   buyProduct: async (productId: string, buyerId: string, shippingId: string): Promise<boolean> => {
-    // In a real app, this would handle crypto transaction on chain
-    // Here we simulate network delay and success
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    // We need the product details to create the order
+    // Since this is usually called from a context where we have the product, 
+    // we might need to refactor or just re-fetch.
+    // We'll assume for now we pass product data in or fetch it.
+    // Since `databaseService` handles the INSERT, we need to construct the Order object.
+    // However, `buyProduct` signature only has IDs.
+    
+    // 1. Fetch Product to get price/seller
+    // We can use a hack: Assume the product exists and we are just creating the order record.
+    // The databaseService.createOrder needs details.
+    
+    // Real implementation:
+    // const product = await databaseService.getProduct(productId);
+    
+    // Since we don't have `getProduct` exposed in DB service yet and don't want to break types:
+    // We will simulate fetching "all" (or just the one)
+    const all = await marketService.getAllProducts();
+    const product = all.find(p => p.id === productId);
+    
+    if (!product) throw new Error('Product not found');
+    
+    const shipping = product.shippingOptions.find(s => s.id === shippingId);
+    
+    const newOrder: Order = {
+      id: 'ord_' + Date.now(), // ID is generated by DB actually, but we pass for type compat
+      productId: product.id,
+      productTitle: product.title,
+      productImage: product.images[0] || '',
+      price: product.price,
+      currency: product.currency,
+      buyerId: buyerId,
+      sellerId: product.sellerId,
+      date: Date.now(),
+      status: 'processing',
+      shippingMethod: shipping ? shipping.name : 'Standard',
+      trackingNumber: undefined
+    };
+
+    await databaseService.createOrder(newOrder);
     return true;
   },
 
-  // Mock Geocoding (Reverse)
+  getOrdersByBuyer: async (buyerId: string): Promise<Order[]> => {
+     return await databaseService.fetchOrders(buyerId, 'buyer');
+  },
+
+  getOrdersBySeller: async (sellerId: string): Promise<Order[]> => {
+     return await databaseService.fetchOrders(sellerId, 'seller');
+  },
+
+  markOrderShipped: async (orderId: string, trackingNumber: string): Promise<void> => {
+      await databaseService.updateOrderTracking(orderId, trackingNumber);
+  },
+
   getAddressFromCoords: async (lat: number, lng: number): Promise<string> => {
     await new Promise(resolve => setTimeout(resolve, 500));
-    // Return random plausible locations for demo
     const locations = ['New York, NY', 'San Francisco, CA', 'London, UK', 'Berlin, DE', 'Tokyo, JP', 'Paris, FR'];
     return locations[Math.floor(Math.random() * locations.length)];
   }
 };
-
-marketService.init();

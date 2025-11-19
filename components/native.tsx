@@ -90,10 +90,12 @@ export const TouchableOpacity: React.FC<TouchableOpacityProps> = ({
 
 interface TextInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   placeholderTextColor?: string;
+  secureTextEntry?: boolean;
 }
 
-export const TextInput: React.FC<TextInputProps> = ({ className = '', ...props }) => (
+export const TextInput: React.FC<TextInputProps> = ({ className = '', secureTextEntry, type, ...props }) => (
   <input 
+    type={secureTextEntry ? 'password' : type}
     className={`bg-transparent border-none focus:outline-none text-white w-full ${className}`} 
     {...props} 
   />

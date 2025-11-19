@@ -1,27 +1,39 @@
 
 import React, { useState, useEffect } from 'react';
-import { Product, User, GeoLocation, ShippingOption } from '../types';
+import { Product, User, GeoLocation, ShippingOption, Order } from '../types';
 import { marketService, CATEGORIES } from '../services/marketService';
 import { authService } from '../services/authService';
-import { Search, Star, ArrowLeft, CheckCircle, Truck, ShieldCheck, Loader2, MapPin, Plus, Trash2, DollarSign, Image as ImageIcon } from 'lucide-react';
+import { Search, Star, ArrowLeft, CheckCircle, Truck, ShieldCheck, Loader2, MapPin, Plus, Trash2, DollarSign, Image as ImageIcon, Package, Clock, MoreVertical, User as UserIcon, MessageCircle } from 'lucide-react';
 import { Card } from '../components/ui/Card';
 import { View, Text, ScrollView, TouchableOpacity, TextInput, Row, Image } from '../components/native';
 
 interface BayMarketProps {
   user: User;
+  onPurchase?: (amount: number, symbol: string, sellerId: string) => void;
+  onMessage?: (userId: string) => void;
 }
 
-type MarketView = 'home' | 'search' | 'detail' | 'checkout' | 'success' | 'vendor_profile' | 'sell';
+type MarketView = 'home' | 'search' | 'detail' | 'checkout' | 'success' | 'vendor_profile' | 'sell' | 'dashboard';
 
-export const BayMarket: React.FC<BayMarketProps> = ({ user }) => {
+export const BayMarket: React.FC<BayMarketProps> = ({ user, onPurchase, onMessage }) => {
   const [view, setView] = useState<MarketView>('home');
   const [products, setProducts] = useState<Product[]>([]);
+  const [isLoadingProducts, setIsLoadingProducts] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [viewedSeller, setViewedSeller] = useState<User | null>(null);
+  const [vendorProducts, setVendorProducts] = useState<Product[]>([]);
   const [selectedShipping, setSelectedShipping] = useState<string>('');
   const [isPurchasing, setIsPurchasing] = useState(false);
+
+  // Dashboard State
+  const [dashboardTab, setDashboardTab] = useState<'buying' | 'selling'>('buying');
+  const [myOrders, setMyOrders] = useState<Order[]>([]);
+  const [mySales, setMySales] = useState<Order[]>([]);
+  const [myListings, setMyListings] = useState<Product[]>([]);
+  const [shipModal, setShipModal] = useState<string | null>(null); // orderId
+  const [trackingInput, setTrackingInput] = useState('');
 
   // Sell Form State
   const [sellForm, setSellForm] = useState<{
@@ -47,15 +59,42 @@ export const BayMarket: React.FC<BayMarketProps> = ({ user }) => {
   });
   const [isPublishing, setIsPublishing] = useState(false);
 
+  // Fetch Products Effect
   useEffect(() => {
-    if (view === 'home' || view === 'search') {
-      if (searchQuery) {
-        setProducts(marketService.searchProducts(searchQuery));
-      } else {
-        setProducts(marketService.getProductsByCategory(selectedCategory));
+    const loadProducts = async () => {
+      setIsLoadingProducts(true);
+      let data: Product[] = [];
+      if (view === 'home' || view === 'search') {
+        if (searchQuery) {
+          data = await marketService.searchProducts(searchQuery);
+        } else {
+          data = await marketService.getProductsByCategory(selectedCategory);
+        }
       }
-    }
+      setProducts(data);
+      setIsLoadingProducts(false);
+    };
+
+    loadProducts();
   }, [searchQuery, selectedCategory, view]);
+
+  // Dashboard Effect
+  useEffect(() => {
+    if (view === 'dashboard') {
+       refreshDashboard();
+    }
+  }, [view]);
+
+  const refreshDashboard = async () => {
+     const orders = await marketService.getOrdersByBuyer(user.id);
+     setMyOrders(orders);
+     
+     const sales = await marketService.getOrdersBySeller(user.id);
+     setMySales(sales);
+     
+     const listings = await marketService.getProductsBySeller(user.id);
+     setMyListings(listings);
+  };
 
   const handleProductClick = (product: Product) => {
     setSelectedProduct(product);
@@ -63,10 +102,12 @@ export const BayMarket: React.FC<BayMarketProps> = ({ user }) => {
     setView('detail');
   };
 
-  const handleVendorClick = (sellerId: string) => {
+  const handleVendorClick = async (sellerId: string) => {
     const seller = authService.getUserById(sellerId);
     if (seller) {
         setViewedSeller(seller);
+        const vProds = await marketService.getProductsBySeller(sellerId);
+        setVendorProducts(vProds);
         setView('vendor_profile');
     }
   };
@@ -78,7 +119,17 @@ export const BayMarket: React.FC<BayMarketProps> = ({ user }) => {
   const handleConfirmPurchase = async () => {
     if (!selectedProduct) return;
     setIsPurchasing(true);
+    
+    // 1. Process Market Data
     await marketService.buyProduct(selectedProduct.id, user.id, selectedShipping);
+    
+    // 2. Process Payment (if callback provided)
+    if (onPurchase) {
+       const shippingOption = selectedProduct.shippingOptions.find(o => o.id === selectedShipping);
+       const total = selectedProduct.price + (shippingOption?.priceUsd || 0);
+       onPurchase(total, selectedProduct.currency, selectedProduct.sellerId);
+    }
+    
     setIsPurchasing(false);
     setView('success');
   };
@@ -87,13 +138,13 @@ export const BayMarket: React.FC<BayMarketProps> = ({ user }) => {
     setIsPublishing(true);
     try {
         const newProduct: Product = {
-            id: 'prod_' + Date.now(),
+            id: 'prod_' + Date.now(), // DB will generate real ID, this is temp
             sellerId: user.id,
             title: sellForm.title,
             description: sellForm.description,
             price: parseFloat(sellForm.price),
             currency: 'USDC',
-            images: [sellForm.imageUrl || 'https://via.placeholder.com/400x400?text=No+Image'], // Fallback
+            images: [sellForm.imageUrl || 'https://via.placeholder.com/400x400?text=No+Image'], 
             category: sellForm.category,
             subcategory: sellForm.subcategory,
             condition: sellForm.condition,
@@ -104,7 +155,6 @@ export const BayMarket: React.FC<BayMarketProps> = ({ user }) => {
         };
         await marketService.publishProduct(newProduct);
         setView('home');
-        // Reset form
     } catch (e) {
         console.error(e);
     } finally {
@@ -112,7 +162,16 @@ export const BayMarket: React.FC<BayMarketProps> = ({ user }) => {
     }
   };
 
-  // --- Mock Map Component for Location Selection ---
+  const handleMarkShipped = async () => {
+     if (shipModal) {
+         await marketService.markOrderShipped(shipModal, trackingInput || 'TRACK-' + Date.now());
+         setShipModal(null);
+         setTrackingInput('');
+         refreshDashboard();
+     }
+  };
+
+  // --- Mock Map Component ---
   const LocationPicker = ({ location, onChange }: { location: GeoLocation, onChange: (loc: GeoLocation) => void }) => {
     const [loadingAddr, setLoadingAddr] = useState(false);
 
@@ -137,7 +196,6 @@ export const BayMarket: React.FC<BayMarketProps> = ({ user }) => {
                 onClick={handleMapClick}
                 className="w-full h-40 bg-slate-800 rounded-xl border border-white/10 relative overflow-hidden cursor-crosshair group"
             >
-                {/* Mock Map Grid */}
                 <div className="absolute inset-0 opacity-20 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:20px_20px]"></div>
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,#0f172a_100%)]"></div>
                 
@@ -158,7 +216,6 @@ export const BayMarket: React.FC<BayMarketProps> = ({ user }) => {
                 </Row>
             )}
             <Row className="items-center gap-2 mt-2">
-                 {/* Checkbox Shim */}
                 <TouchableOpacity 
                     onPress={() => onChange({...location, isLocalPickupAvailable: !location.isLocalPickupAvailable})}
                     className={`w-5 h-5 rounded border flex items-center justify-center ${location.isLocalPickupAvailable ? 'bg-primary border-primary' : 'bg-white/5 border-white/20'}`}
@@ -193,6 +250,12 @@ export const BayMarket: React.FC<BayMarketProps> = ({ user }) => {
           />
         </View>
         <TouchableOpacity 
+            onPress={() => setView('dashboard')} 
+            className="p-2.5 bg-surface border border-white/10 rounded-xl flex-row items-center gap-1"
+        >
+           <UserIcon size={16} className="text-slate-400" /> 
+        </TouchableOpacity>
+        <TouchableOpacity 
             onPress={() => setView('sell')} 
             className="px-3 py-2 bg-primary rounded-xl flex-row items-center gap-1"
         >
@@ -226,9 +289,148 @@ export const BayMarket: React.FC<BayMarketProps> = ({ user }) => {
 
   // --- Views ---
 
+  if (view === 'dashboard') {
+     return (
+        <View className="flex-1 h-full bg-black pb-20">
+           <View className="px-4 pt-4 pb-2 bg-surface/10">
+              <Row className="items-center gap-3 mb-6">
+                 <TouchableOpacity onPress={() => setView('home')} className="p-2 rounded-full bg-surface/50">
+                    <ArrowLeft size={20} className="text-white" />
+                 </TouchableOpacity>
+                 <Text className="text-2xl font-bold">My Bay</Text>
+              </Row>
+              
+              <Row className="p-1 bg-surface rounded-xl border border-white/5">
+                 <TouchableOpacity 
+                   onPress={() => setDashboardTab('buying')}
+                   className={`flex-1 py-2.5 items-center rounded-lg ${dashboardTab === 'buying' ? 'bg-white/10 shadow-sm' : ''}`}
+                 >
+                    <Text className={`text-sm font-bold ${dashboardTab === 'buying' ? 'text-white' : 'text-slate-400'}`}>Buying</Text>
+                 </TouchableOpacity>
+                 <TouchableOpacity 
+                   onPress={() => setDashboardTab('selling')}
+                   className={`flex-1 py-2.5 items-center rounded-lg ${dashboardTab === 'selling' ? 'bg-white/10 shadow-sm' : ''}`}
+                 >
+                    <Text className={`text-sm font-bold ${dashboardTab === 'selling' ? 'text-white' : 'text-slate-400'}`}>Selling</Text>
+                 </TouchableOpacity>
+              </Row>
+           </View>
+
+           <ScrollView contentContainerStyle="p-4 space-y-4">
+              {dashboardTab === 'buying' ? (
+                 <>
+                    <Text className="text-xs font-bold text-slate-500 uppercase tracking-wider">Purchase History</Text>
+                    {myOrders.length === 0 && (
+                       <View className="items-center py-10 border border-dashed border-white/10 rounded-xl">
+                          <Package className="text-slate-600 mb-2" size={32} />
+                          <Text className="text-slate-500 text-sm">No purchases yet.</Text>
+                       </View>
+                    )}
+                    {myOrders.map(order => (
+                       <Card key={order.id} className="p-4">
+                          <Row className="gap-3 items-start">
+                             <Image source={order.productImage} className="w-16 h-16 rounded-lg object-cover bg-slate-800" />
+                             <View className="flex-1">
+                                <Text className="font-bold text-sm mb-1 line-clamp-1">{order.productTitle}</Text>
+                                <Text className="text-xs text-primary font-bold mb-2">{order.price} {order.currency}</Text>
+                                <Row className="items-center gap-2">
+                                   <View className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${order.status === 'delivered' ? 'bg-emerald-500/20 text-emerald-400' : order.status === 'shipped' ? 'bg-blue-500/20 text-blue-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
+                                      <Text className="text-current">{order.status}</Text>
+                                   </View>
+                                   <Text className="text-[10px] text-slate-500">{new Date(order.date).toLocaleDateString()}</Text>
+                                </Row>
+                             </View>
+                          </Row>
+                          {order.trackingNumber && (
+                             <View className="mt-3 pt-3 border-t border-white/5">
+                                <Text className="text-[10px] text-slate-400">Tracking: <Text className="text-white font-mono">{order.trackingNumber}</Text></Text>
+                             </View>
+                          )}
+                       </Card>
+                    ))}
+                 </>
+              ) : (
+                 <>
+                    <Text className="text-xs font-bold text-slate-500 uppercase tracking-wider">Active Orders to Ship</Text>
+                    {mySales.filter(s => s.status === 'processing').length === 0 && (
+                       <View className="p-4 bg-surface/30 rounded-xl">
+                          <Text className="text-sm text-slate-500">No pending orders to ship.</Text>
+                       </View>
+                    )}
+                    {mySales.filter(s => s.status === 'processing').map(order => (
+                       <Card key={order.id} className="p-4 border-l-4 border-l-yellow-500">
+                          <Row className="justify-between items-start mb-2">
+                             <View>
+                                <Text className="font-bold text-sm">Sold: {order.productTitle}</Text>
+                                <Text className="text-xs text-slate-400">Buyer: {order.buyerId}</Text>
+                             </View>
+                             <Text className="text-sm font-bold text-primary">{order.price} {order.currency}</Text>
+                          </Row>
+                          <TouchableOpacity 
+                             onPress={() => setShipModal(order.id)}
+                             className="w-full py-2 bg-primary rounded-lg items-center justify-center mt-2"
+                          >
+                             <Text className="text-white text-xs font-bold">Mark as Shipped</Text>
+                          </TouchableOpacity>
+                       </Card>
+                    ))}
+
+                    <Text className="text-xs font-bold text-slate-500 uppercase tracking-wider mt-4">My Active Listings</Text>
+                    <View className="grid grid-cols-2 gap-2">
+                       {myListings.map(item => (
+                          <Card key={item.id} className="p-2">
+                             <Image source={item.images[0]} className="w-full h-24 rounded-lg object-cover mb-2 bg-slate-800" />
+                             <Text className="font-bold text-xs line-clamp-1">{item.title}</Text>
+                             <Row className="justify-between items-center mt-1">
+                                <Text className="text-xs font-bold text-primary">{item.price}</Text>
+                                <MoreVertical size={14} className="text-slate-500" />
+                             </Row>
+                          </Card>
+                       ))}
+                       <TouchableOpacity 
+                          onPress={() => setView('sell')}
+                          className="bg-surface/30 border border-dashed border-white/20 rounded-xl flex items-center justify-center h-36"
+                       >
+                          <Plus size={24} className="text-slate-400 mb-1" />
+                          <Text className="text-xs font-bold text-slate-400">List New Item</Text>
+                       </TouchableOpacity>
+                    </View>
+                 </>
+              )}
+           </ScrollView>
+
+           {/* Ship Modal */}
+           {shipModal && (
+              <View className="absolute inset-0 bg-black/80 flex items-center justify-center p-6 z-50">
+                 <View className="bg-surface w-full max-w-sm rounded-2xl border border-white/10 p-5">
+                    <Text className="text-lg font-bold mb-4">Confirm Shipment</Text>
+                    <Text className="text-sm text-slate-400 mb-4">Please provide the tracking number for this order.</Text>
+                    
+                    <TextInput 
+                       value={trackingInput}
+                       onChange={(e) => setTrackingInput(e.target.value)}
+                       placeholder="Tracking Number (e.g. USPS...)"
+                       className="w-full bg-black/30 border border-white/10 rounded-xl p-3 text-white mb-4"
+                    />
+                    
+                    <Row className="gap-2">
+                       <TouchableOpacity onPress={() => setShipModal(null)} className="flex-1 py-3 bg-surface border border-white/10 rounded-xl items-center">
+                          <Text className="text-white text-sm font-bold">Cancel</Text>
+                       </TouchableOpacity>
+                       <TouchableOpacity onPress={handleMarkShipped} className="flex-1 py-3 bg-primary rounded-xl items-center">
+                          <Text className="text-white text-sm font-bold">Confirm</Text>
+                       </TouchableOpacity>
+                    </Row>
+                 </View>
+              </View>
+           )}
+        </View>
+     );
+  }
+
   if (view === 'sell') {
     return (
-        <View className="flex-1 h-full pb-24">
+        <View className="flex-1 h-full pb-24 bg-black">
             <Row className="items-center gap-4 px-4 py-4 border-b border-white/5 bg-background z-20">
                 <TouchableOpacity onPress={() => setView('home')} className="p-2 -ml-2 rounded-full hover:bg-white/10">
                     <ArrowLeft size={20} className="text-white" />
@@ -386,10 +588,10 @@ export const BayMarket: React.FC<BayMarketProps> = ({ user }) => {
   }
 
   if (view === 'vendor_profile' && viewedSeller) {
-      const vendorProducts = marketService.getProductsBySeller(viewedSeller.id);
+      // Use the fetched vendorProducts state
       
       return (
-          <View className="flex-1 h-full pb-24">
+          <View className="flex-1 h-full pb-24 bg-black">
              {/* Header Image / Map Bg */}
              <View className="h-40 bg-gradient-to-r from-slate-800 to-slate-900 relative overflow-hidden">
                  <div className="absolute inset-0 opacity-20 bg-[url('https://grainy-gradients.vercel.app/noise.svg')]"></div>
@@ -446,6 +648,17 @@ export const BayMarket: React.FC<BayMarketProps> = ({ user }) => {
                              <Text className="text-emerald-400 text-[10px] font-bold">{viewedSeller.vendorStats?.totalSales}+ Sales</Text>
                          </View>
                      </Row>
+                     
+                     {/* Action Buttons */}
+                     {onMessage && (
+                       <TouchableOpacity 
+                          onPress={() => onMessage(viewedSeller.id)}
+                          className="mt-4 w-full py-2 bg-surface border border-white/10 rounded-xl flex-row items-center justify-center gap-2"
+                       >
+                          <MessageCircle size={16} className="text-white" />
+                          <Text className="font-bold text-sm text-white">Message Seller</Text>
+                       </TouchableOpacity>
+                     )}
                  </View>
              </View>
 
@@ -492,7 +705,7 @@ export const BayMarket: React.FC<BayMarketProps> = ({ user }) => {
 
   if (view === 'success') {
     return (
-      <View className="h-full items-center justify-center p-6">
+      <View className="h-full items-center justify-center p-6 bg-black">
         <View className="w-20 h-20 bg-emerald-500/20 rounded-full items-center justify-center mb-4">
           <CheckCircle size={48} className="text-emerald-500" />
         </View>
@@ -519,7 +732,7 @@ export const BayMarket: React.FC<BayMarketProps> = ({ user }) => {
     const total = (selectedProduct?.price || 0) + (shippingOption?.priceUsd || 0); 
 
     return (
-      <View className="flex-1 h-full pb-20">
+      <View className="flex-1 h-full pb-20 bg-black">
         {renderHeader()}
         <ScrollView contentContainerStyle="p-2 space-y-4 mt-2">
            <Text className="text-xl font-bold">Review Order</Text>
@@ -615,7 +828,7 @@ export const BayMarket: React.FC<BayMarketProps> = ({ user }) => {
     const seller = authService.getUserById(selectedProduct.sellerId);
 
     return (
-      <View className="flex-1 h-full pb-20">
+      <View className="flex-1 h-full pb-20 bg-black">
         {renderHeader()}
         
         <ScrollView>
@@ -720,51 +933,57 @@ export const BayMarket: React.FC<BayMarketProps> = ({ user }) => {
   // --- Home View ---
 
   return (
-    <View className="flex-1 h-full pb-20">
+    <View className="flex-1 h-full pb-20 bg-black">
       {renderHeader()}
       
       {/* Content Area */}
       <ScrollView contentContainerStyle="p-2">
-        <View className="grid grid-cols-2 gap-2 mt-2">
-        {products.length === 0 ? (
-          <View className="col-span-2 items-center py-10 opacity-50">
-             <Search size={32} className="mb-2 text-slate-500" />
-             <Text className="text-sm text-slate-500">No items found in {selectedCategory}</Text>
-          </View>
+        {isLoadingProducts ? (
+           <View className="items-center py-20">
+               <Loader2 className="animate-spin text-primary" />
+           </View>
         ) : (
-          products.map(product => (
-            <Card 
-               key={product.id} 
-               onClick={() => handleProductClick(product)}
-               className="overflow-hidden"
-            >
-               <View className="aspect-square w-full bg-white relative">
-                  <Image source={product.images[0]} className="w-full h-full object-cover" />
-                  {product.condition === 'New' && (
-                     <View className="absolute top-2 left-2 bg-emerald-500 px-1.5 py-0.5 rounded">
-                       <Text className="text-white text-[10px] font-bold">NEW</Text>
-                     </View>
-                  )}
-               </View>
-               <View className="p-3">
-                  <Text className="font-bold text-sm mb-1 h-10" style={{ overflow: 'hidden' }}>{product.title}</Text>
-                  <Text className="font-bold text-primary text-sm">{product.price} {product.currency}</Text>
-                  <Row className="items-center justify-between mt-2">
-                     <Text className="text-[10px] text-slate-400 truncate max-w-[80px]">@{authService.getUserById(product.sellerId)?.username}</Text>
-                     <Row className="items-center gap-0.5">
-                        <Star size={8} className="fill-yellow-400 text-yellow-400" /> 
-                        <Text className="text-[10px] text-slate-400">4.8</Text>
+           <View className="grid grid-cols-2 gap-2 mt-2">
+           {products.length === 0 ? (
+             <View className="col-span-2 items-center py-10 opacity-50">
+                <Search size={32} className="mb-2 text-slate-500" />
+                <Text className="text-sm text-slate-500">No items found in {selectedCategory}</Text>
+             </View>
+           ) : (
+             products.map(product => (
+               <Card 
+                  key={product.id} 
+                  onClick={() => handleProductClick(product)}
+                  className="overflow-hidden"
+               >
+                  <View className="aspect-square w-full bg-white relative">
+                     <Image source={product.images[0]} className="w-full h-full object-cover" />
+                     {product.condition === 'New' && (
+                        <View className="absolute top-2 left-2 bg-emerald-500 px-1.5 py-0.5 rounded">
+                          <Text className="text-white text-[10px] font-bold">NEW</Text>
+                        </View>
+                     )}
+                  </View>
+                  <View className="p-3">
+                     <Text className="font-bold text-sm mb-1 h-10" style={{ overflow: 'hidden' }}>{product.title}</Text>
+                     <Text className="font-bold text-primary text-sm">{product.price} {product.currency}</Text>
+                     <Row className="items-center justify-between mt-2">
+                        <Text className="text-[10px] text-slate-400 truncate max-w-[80px]">@{authService.getUserById(product.sellerId)?.username}</Text>
+                        <Row className="items-center gap-0.5">
+                           <Star size={8} className="fill-yellow-400 text-yellow-400" /> 
+                           <Text className="text-[10px] text-slate-400">4.8</Text>
+                        </Row>
                      </Row>
-                  </Row>
-                  <Row className="items-center gap-1 mt-1">
-                     <MapPin size={8} className="text-slate-500" /> 
-                     <Text className="text-[9px] text-slate-500">{product.location?.address.split(',')[0] || 'Remote'}</Text>
-                  </Row>
-               </View>
-            </Card>
-          ))
+                     <Row className="items-center gap-1 mt-1">
+                        <MapPin size={8} className="text-slate-500" /> 
+                        <Text className="text-[9px] text-slate-500">{product.location?.address.split(',')[0] || 'Remote'}</Text>
+                     </Row>
+                  </View>
+               </Card>
+             ))
+           )}
+           </View>
         )}
-        </View>
       </ScrollView>
     </View>
   );

@@ -2,8 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { ViewState, User, ActivityLog } from '../types';
 import { authService } from '../services/authService';
-import { ChevronLeft, Shield, Smartphone, Lock, Key, Clock, MapPin, AlertTriangle, CheckCircle, Monitor } from 'lucide-react';
-import { Card } from '../components/ui/Card';
+import { ChevronLeft, Shield, Smartphone, Lock, Key, Laptop, Fingerprint, ArrowLeft, AlertCircle, Check } from 'lucide-react';
 import { View, Text, ScrollView, TouchableOpacity, Row, TextInput } from '../components/native';
 
 interface SecurityProps {
@@ -38,141 +37,143 @@ export const Security: React.FC<SecurityProps> = ({ user, onNavigate, onUpdateUs
      onUpdateUser(updated);
   };
 
+  const securityScore = 
+     (user.settings.biometricsEnabled ? 25 : 0) + 
+     (user.recoveryPhrase ? 25 : 0) + 
+     (user.settings.backup?.cloudEnabled ? 15 : 0) + 
+     (user.settings.antiPhishingCode ? 15 : 0) + 
+     (user.isEmailVerified ? 20 : 0);
+
   return (
-    <View className="flex-1 h-full">
-      <ScrollView contentContainerStyle="p-5 pb-24">
-        <Row className="items-center gap-4 mt-4 mb-6">
-          <TouchableOpacity onPress={() => onNavigate(ViewState.PROFILE)} className="p-2 rounded-full hover:bg-white/10">
-             <ChevronLeft size={24} className="text-white" />
-          </TouchableOpacity>
-          <Text className="text-2xl font-bold">Security Center</Text>
+    <View className="flex-1 h-full bg-[#050505] flex flex-col">
+      {/* Header */}
+      <View className="px-6 pt-safe-top pb-2 flex-row items-center justify-between z-10 bg-black/20">
+        <Row className="items-center gap-3">
+            <TouchableOpacity 
+                onPress={() => onNavigate(ViewState.PROFILE)} 
+                className="w-10 h-10 rounded-full bg-surface/50 border border-white/10 items-center justify-center active:bg-white/10"
+            >
+                <ArrowLeft size={20} className="text-white" />
+            </TouchableOpacity>
+            <Text className="text-lg font-bold text-white tracking-tight">Security Center</Text>
         </Row>
+      </View>
 
-        {/* 2-Factor Auth Banner */}
-        <View className="bg-gradient-to-r from-emerald-600 to-teal-600 rounded-2xl p-5 relative overflow-hidden shadow-lg mb-6">
-           <View className="relative z-10">
-              <Row className="items-center gap-2 mb-2">
-                 <Shield className="text-white" size={24} />
-                 <Text className="text-lg font-bold text-white">Account Protected</Text>
-              </Row>
-              <Text className="text-xs text-emerald-100 mb-4 max-w-[80%] leading-relaxed">
-                 Your account is secured with a robust recovery phrase and device-level encryption.
-              </Text>
-              <Row className="gap-2">
-                 <View className="px-2 py-1 bg-black/20 rounded">
-                    <Text className="text-[10px] font-bold text-white">2FA: Active</Text>
-                 </View>
-                 <View className="px-2 py-1 bg-black/20 rounded">
-                    <Text className="text-[10px] font-bold text-white">Encryption: 256-bit</Text>
-                 </View>
-              </Row>
-           </View>
-           <Lock className="absolute -right-4 -bottom-8 text-white opacity-10" size={120} />
+      {/* Main Content - Flex Layout, No Scroll needed */}
+      <View className="flex-1 px-6 py-4 flex flex-col gap-5">
+        
+        {/* 1. Health Score Banner */}
+        <View className="bg-gradient-to-r from-emerald-900/30 to-slate-900 border border-emerald-500/20 rounded-2xl p-4 flex-row items-center justify-between shadow-lg relative overflow-hidden">
+            <div className="absolute -right-4 -top-4 w-24 h-24 bg-emerald-500/10 rounded-full blur-xl" />
+            <View>
+                <Text className="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-1">Security Score</Text>
+                <Text className="text-3xl font-bold text-white">{securityScore}/100</Text>
+                <Text className="text-slate-400 text-[10px] mt-1">Account is {securityScore > 80 ? 'Protected' : 'At Risk'}</Text>
+            </View>
+            {/* Mini Donut Chart */}
+            <View className="w-14 h-14 rounded-full border-4 border-emerald-500/10 flex items-center justify-center relative">
+                 <Shield size={20} className="text-emerald-500" />
+                 <svg className="absolute inset-0 w-full h-full rotate-[-90deg]" viewBox="0 0 36 36">
+                    <path className="text-emerald-500 transition-all duration-1000" strokeDasharray={`${securityScore}, 100`} d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                 </svg>
+            </View>
         </View>
 
-        {/* Authentication Methods */}
-        <View className="space-y-2 mb-6">
-           <Text className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Authentication</Text>
-           <Card className="p-4">
-              {/* Change Password */}
-              <Row className="items-center justify-between mb-4">
-                 <Row className="items-center gap-3">
-                    <View className="p-2 bg-indigo-500/10 rounded-lg"><Key size={18} className="text-indigo-400" /></View>
-                    <View>
-                       <Text className="text-sm font-bold">Change Password</Text>
-                       <Text className="text-xs text-slate-400">Last changed 30 days ago</Text>
-                    </View>
-                 </Row>
-                 <TouchableOpacity className="px-3 py-1.5 bg-primary/10 rounded-lg">
-                    <Text className="text-xs font-bold text-primary">Update</Text>
-                 </TouchableOpacity>
-              </Row>
-              
-              {/* Biometrics */}
-              <View className="h-px bg-white/5 my-2" />
-              
-              <Row className="items-center justify-between mt-2">
-                 <Row className="items-center gap-3">
-                    <View className="p-2 bg-emerald-500/10 rounded-lg"><Smartphone size={18} className="text-emerald-400" /></View>
-                    <View>
-                       <Text className="text-sm font-bold">Biometric Login</Text>
-                       <Text className="text-xs text-slate-400">FaceID / TouchID</Text>
-                    </View>
-                 </Row>
-                 <TouchableOpacity 
-                    onPress={toggleBiometrics}
-                    className={`w-11 h-6 rounded-full relative ${user.settings.biometricsEnabled ? 'bg-primary' : 'bg-slate-700'}`}
-                 >
-                    <View className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-all ${user.settings.biometricsEnabled ? 'left-6' : 'left-1'}`} />
-                 </TouchableOpacity>
-              </Row>
-           </Card>
+        {/* 2. Control Grid (2x2) - Takes minimal vertical space */}
+        <View className="grid grid-cols-2 gap-3">
+            {/* Vault Key */}
+            <TouchableOpacity onPress={() => onNavigate(ViewState.BACKUP)} className="bg-surface/40 border border-white/5 rounded-2xl p-4 flex-col justify-between h-32 active:bg-white/5 hover:border-white/10 transition-colors">
+                <View className="w-10 h-10 rounded-xl bg-yellow-500/10 flex items-center justify-center"><Key size={20} className="text-yellow-500" /></View>
+                <View>
+                    <Text className="font-bold text-sm text-white">Vault Key</Text>
+                    <Text className="text-[10px] text-slate-400 mt-0.5">Backup phrase</Text>
+                </View>
+            </TouchableOpacity>
+
+            {/* Devices */}
+            <TouchableOpacity onPress={() => onNavigate(ViewState.DEVICES)} className="bg-surface/40 border border-white/5 rounded-2xl p-4 flex-col justify-between h-32 active:bg-white/5 hover:border-white/10 transition-colors">
+                <View className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center"><Laptop size={20} className="text-blue-400" /></View>
+                <View>
+                    <Text className="font-bold text-sm text-white">Sessions</Text>
+                    <Text className="text-[10px] text-slate-400 mt-0.5">Manage devices</Text>
+                </View>
+            </TouchableOpacity>
+
+            {/* Biometrics */}
+            <TouchableOpacity onPress={toggleBiometrics} className={`border rounded-2xl p-4 flex-col justify-between h-32 active:bg-white/5 transition-colors ${user.settings.biometricsEnabled ? 'bg-indigo-500/10 border-indigo-500/30' : 'bg-surface/40 border-white/5'}`}>
+                <View className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center"><Fingerprint size={20} className="text-indigo-400" /></View>
+                <View>
+                    <Text className="font-bold text-sm text-white">Biometrics</Text>
+                    <Text className="text-[10px] text-slate-400 mt-0.5">{user.settings.biometricsEnabled ? 'Enabled' : 'Disabled'}</Text>
+                </View>
+            </TouchableOpacity>
+
+            {/* Anti-Phishing */}
+            <TouchableOpacity onPress={() => setIsEditingPhishing(true)} className={`bg-surface/40 border rounded-2xl p-4 flex-col justify-between h-32 active:bg-white/5 transition-colors ${phishingCode ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-white/5'}`}>
+                <View className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center"><Shield size={20} className="text-emerald-400" /></View>
+                <View>
+                    <Text className="font-bold text-sm text-white">Anti-Phish</Text>
+                    <Text className="text-[10px] text-slate-400 mt-0.5">{phishingCode ? 'Active' : 'Set Code'}</Text>
+                </View>
+            </TouchableOpacity>
         </View>
 
-        {/* Anti-Phishing Code */}
-        <View className="space-y-2 mb-6">
-           <Text className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Anti-Phishing</Text>
-           <Card className="p-4">
-              <Text className="text-xs text-slate-400 mb-3 leading-relaxed">
-                 Set a unique code that will appear in all official emails from Nova to verify authenticity.
-              </Text>
-              <Row className="gap-2">
-                 <TextInput 
-                    disabled={!isEditingPhishing}
-                    value={phishingCode}
-                    onChange={(e) => setPhishingCode(e.target.value)}
-                    placeholder="e.g. MySecretCode123"
-                    className={`flex-1 bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-sm text-white ${!isEditingPhishing ? 'opacity-50' : ''}`}
-                 />
-                 {isEditingPhishing ? (
-                    <TouchableOpacity onPress={handlePhishingSave} className="px-4 bg-emerald-500 rounded-xl items-center justify-center">
-                        <Text className="text-xs font-bold text-white">Save</Text>
-                    </TouchableOpacity>
-                 ) : (
-                    <TouchableOpacity onPress={() => setIsEditingPhishing(true)} className="px-4 bg-surface border border-white/10 rounded-xl items-center justify-center">
-                        <Text className="text-slate-300 text-xs font-bold">Edit</Text>
-                    </TouchableOpacity>
-                 )}
-              </Row>
-           </Card>
+        {/* 3. Recent Activity Log - Flexible Height */}
+        <View className="flex-1 bg-surface/20 border border-white/5 rounded-2xl p-4 flex flex-col overflow-hidden min-h-[150px] mb-safe-bottom">
+            <Text className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Recent Activity</Text>
+            
+            <ScrollView className="flex-1">
+               {activityLogs.length === 0 ? (
+                   <Text className="text-[10px] text-slate-600 italic text-center mt-4">No recent activity.</Text>
+               ) : (
+                   <View className="gap-3">
+                       {activityLogs.slice(0, 5).map(log => (
+                           <Row key={log.id} className="items-center justify-between">
+                               <Row className="items-center gap-3">
+                                   <View className={`w-1.5 h-1.5 rounded-full ${log.status === 'success' ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                                   <View>
+                                       <Text className="text-xs font-bold text-white">{log.action}</Text>
+                                       <Text className="text-[9px] text-slate-500">{log.device}</Text>
+                                   </View>
+                               </Row>
+                               <Text className="text-[9px] text-slate-600 font-mono">{new Date(log.timestamp).toLocaleDateString()}</Text>
+                           </Row>
+                       ))}
+                   </View>
+               )}
+            </ScrollView>
         </View>
 
-        {/* Recent Activity */}
-        <View className="space-y-2">
-           <Text className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Recent Activity</Text>
-           <View className="gap-2">
-              {activityLogs.map(log => (
-                 <Card key={log.id} className="p-3">
-                    <Row className="items-center justify-between">
-                       <Row className="items-center gap-3">
-                          <View className={`p-2 rounded-lg ${log.status === 'success' ? 'bg-emerald-500/10' : 'bg-red-500/10'}`}>
-                             {log.status === 'success' ? <CheckCircle size={16} className="text-emerald-400" /> : <AlertTriangle size={16} className="text-red-400" />}
-                          </View>
-                          <View>
-                             <Text className="text-sm font-bold">{log.action}</Text>
-                             <Row className="items-center gap-2">
-                                <Row className="items-center gap-0.5">
-                                    <Monitor size={10} className="text-slate-400" /> 
-                                    <Text className="text-[10px] text-slate-400">{log.device}</Text>
-                                </Row>
-                                <Row className="items-center gap-0.5">
-                                    <MapPin size={10} className="text-slate-400" /> 
-                                    <Text className="text-[10px] text-slate-400">{log.location}</Text>
-                                </Row>
-                             </Row>
-                          </View>
-                       </Row>
-                       <View className="items-end">
-                          <Clock size={10} className="text-slate-500 mb-0.5" />
-                          <Text className="text-[10px] text-slate-500">{new Date(log.timestamp).toLocaleDateString()}</Text>
-                          <Text className="text-[10px] text-slate-500">{new Date(log.timestamp).toLocaleTimeString()}</Text>
-                       </View>
-                    </Row>
-                 </Card>
-              ))}
-           </View>
-        </View>
-      </ScrollView>
+      </View>
+
+      {/* Phishing Modal */}
+      {isEditingPhishing && (
+          <View className="absolute inset-0 z-50 bg-black/90 flex items-center justify-center p-6">
+              <View className="w-full max-w-xs bg-surface border border-white/10 rounded-2xl p-5 shadow-2xl">
+                  <Text className="text-lg font-bold text-white mb-2">Anti-Phishing Code</Text>
+                  <Text className="text-xs text-slate-400 mb-4 leading-relaxed">
+                      Set a unique code that will appear in all official emails from Nova. This helps you identify fake emails.
+                  </Text>
+                  
+                  <TextInput 
+                      value={phishingCode}
+                      onChange={(e) => setPhishingCode(e.target.value)}
+                      placeholder="e.g. 'Blue Falcon'"
+                      className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white mb-4 focus:border-emerald-500/50 transition-colors"
+                      autoFocus
+                  />
+
+                  <Row className="gap-3">
+                      <TouchableOpacity onPress={() => setIsEditingPhishing(false)} className="flex-1 py-3 bg-surface border border-white/10 rounded-xl items-center">
+                          <Text className="text-xs font-bold text-slate-300">Cancel</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={handlePhishingSave} className="flex-1 py-3 bg-emerald-600 rounded-xl items-center">
+                          <Text className="text-xs font-bold text-white">Save Code</Text>
+                      </TouchableOpacity>
+                  </Row>
+              </View>
+          </View>
+      )}
     </View>
   );
 };

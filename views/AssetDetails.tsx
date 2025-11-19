@@ -1,8 +1,10 @@
 
+
+
 import React from 'react';
 import { Asset, Transaction } from '../types';
 import { View, Text, ScrollView, TouchableOpacity, Row } from '../components/native';
-import { ChevronLeft, ArrowUpRight, ArrowDownLeft, TrendingUp, Activity, Sparkles } from 'lucide-react';
+import { ChevronLeft, ArrowUpRight, ArrowDownLeft, TrendingUp, Activity, Sparkles, CreditCard } from 'lucide-react';
 import { AreaChart, Area, ResponsiveContainer, Tooltip } from 'recharts';
 
 interface AssetDetailsProps {
@@ -10,11 +12,12 @@ interface AssetDetailsProps {
   onBack: () => void;
   onSend: () => void;
   onReceive: () => void;
+  onBuy?: () => void; // New
   onAskAI?: (prompt: string) => void;
   transactions: Transaction[];
 }
 
-export const AssetDetails: React.FC<AssetDetailsProps> = ({ asset, onBack, onSend, onReceive, onAskAI, transactions }) => {
+export const AssetDetails: React.FC<AssetDetailsProps> = ({ asset, onBack, onSend, onReceive, onBuy, onAskAI, transactions }) => {
   
   const handleAskAI = () => {
      if (onAskAI) {
@@ -114,9 +117,13 @@ export const AssetDetails: React.FC<AssetDetailsProps> = ({ asset, onBack, onSen
                     <ArrowUpRight size={18} className="text-white" />
                     <Text className="font-bold text-white">Send</Text>
                  </TouchableOpacity>
-                 <TouchableOpacity onPress={onReceive} className="flex-1 bg-primary py-3 rounded-xl flex-row items-center justify-center gap-2 shadow-lg shadow-indigo-500/30">
+                 <TouchableOpacity onPress={onReceive} className="flex-1 bg-surface border border-white/10 py-3 rounded-xl flex-row items-center justify-center gap-2">
                     <ArrowDownLeft size={18} className="text-white" />
                     <Text className="font-bold text-white">Receive</Text>
+                 </TouchableOpacity>
+                 <TouchableOpacity onPress={onBuy} className="flex-1 bg-primary py-3 rounded-xl flex-row items-center justify-center gap-2 shadow-lg shadow-indigo-500/30">
+                    <CreditCard size={18} className="text-white" />
+                    <Text className="font-bold text-white">Buy</Text>
                  </TouchableOpacity>
               </Row>
            </View>
@@ -135,8 +142,8 @@ export const AssetDetails: React.FC<AssetDetailsProps> = ({ asset, onBack, onSen
                  {transactions.map(tx => (
                     <View key={tx.id} className="flex-row justify-between items-center p-4 bg-surface/50 border border-white/5 rounded-xl">
                        <Row className="items-center gap-3">
-                          <View className={`p-2 rounded-full ${tx.type === 'receive' ? 'bg-emerald-500/10' : 'bg-slate-700'}`}>
-                             {tx.type === 'receive' ? <ArrowDownLeft size={16} className="text-emerald-400" /> : <ArrowUpRight size={16} className="text-white" />}
+                          <View className={`p-2 rounded-full ${tx.type === 'receive' || tx.type === 'buy' ? 'bg-emerald-500/10' : 'bg-slate-700'}`}>
+                             {tx.type === 'receive' || tx.type === 'buy' ? <ArrowDownLeft size={16} className="text-emerald-400" /> : <ArrowUpRight size={16} className="text-white" />}
                           </View>
                           <View>
                              <Text className="font-bold text-sm capitalize">{tx.type}</Text>
@@ -144,8 +151,8 @@ export const AssetDetails: React.FC<AssetDetailsProps> = ({ asset, onBack, onSen
                           </View>
                        </Row>
                        <View className="items-end">
-                          <Text className={`font-bold text-sm ${tx.type === 'receive' ? 'text-emerald-400' : 'text-white'}`}>
-                             {tx.type === 'receive' ? '+' : '-'}{tx.amount} {tx.assetSymbol}
+                          <Text className={`font-bold text-sm ${tx.type === 'receive' || tx.type === 'buy' ? 'text-emerald-400' : 'text-white'}`}>
+                             {tx.type === 'receive' || tx.type === 'buy' ? '+' : '-'}{tx.amount} {tx.assetSymbol}
                           </Text>
                           <Text className="text-[10px] text-slate-500">${tx.valueUsd.toFixed(2)}</Text>
                        </View>

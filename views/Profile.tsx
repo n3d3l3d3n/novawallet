@@ -58,7 +58,6 @@ export const Profile: React.FC<ProfileProps> = ({ user, onNavigate, onLogout, on
     { icon: Settings, label: 'Settings', view: ViewState.SETTINGS, color: 'text-slate-300' },
     { icon: Shield, label: 'Security Center', view: ViewState.SECURITY, color: 'text-emerald-400' },
     { icon: FileText, label: 'Legal & Compliance', view: ViewState.LEGAL, color: 'text-blue-400' },
-    { icon: Smartphone, label: 'Connected Apps', view: ViewState.CONNECTED_APPS, color: 'text-indigo-300' },
     { icon: Users, label: 'Affiliate Program', view: ViewState.AFFILIATE, color: 'text-purple-400', badge: 'Earn' },
     { icon: Newspaper, label: 'Crypto News', view: ViewState.NEWS, color: 'text-orange-400' },
     { icon: Bell, label: 'Notifications', view: ViewState.NOTIFICATIONS, color: 'text-pink-400' },

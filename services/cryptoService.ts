@@ -1,5 +1,7 @@
 
-import { Asset, NFT } from '../types';
+
+
+import { Asset, NFT, StakingOption, StakingPosition } from '../types';
 
 const API_URL = 'https://api.coingecko.com/api/v3';
 const CACHE_KEY = 'nova_crypto_cache';
@@ -14,6 +16,9 @@ interface CoinGeckoCoin {
   sparkline_in_7d: { price: number[] };
   image: string;
 }
+
+// Local storage key for user minted NFTs
+const MINTED_NFTS_KEY = 'nova_minted_nfts';
 
 export const cryptoService = {
   
@@ -43,7 +48,7 @@ export const cryptoService = {
 
       const rawData: CoinGeckoCoin[] = await response.json();
 
-      // 3. Transform Data
+      // 3. Transform Data with Mock Networks
       const assets: Asset[] = rawData.map((coin) => {
         // Simple downsample of sparkline data for performance (take every 4th point)
         const chartData = coin.sparkline_in_7d.price
@@ -55,15 +60,40 @@ export const cryptoService = {
             ? 'bg-emerald-500' 
             : 'bg-red-500';
 
+        // Assign realistic networks
+        let network = 'Ethereum';
+        let tokenType = 'ERC20';
+        let availableNetworks: string[] = ['Ethereum'];
+
+        const s = coin.symbol.toUpperCase();
+        if (s === 'BTC') { network = 'Bitcoin'; tokenType = 'Native'; availableNetworks = ['Bitcoin', 'Lightning']; }
+        else if (s === 'ETH') { network = 'Ethereum'; tokenType = 'Native'; availableNetworks = ['Ethereum', 'Arbitrum', 'Optimism', 'Base']; }
+        else if (s === 'SOL') { network = 'Solana'; tokenType = 'Native'; availableNetworks = ['Solana']; }
+        else if (s === 'USDC' || s === 'USDT') { 
+            network = 'Ethereum'; 
+            tokenType = 'ERC20'; 
+            availableNetworks = ['Ethereum', 'Solana', 'Tron', 'Polygon', 'BSC', 'Avalanche']; 
+        }
+        else if (s === 'MATIC') { network = 'Polygon'; tokenType = 'Native'; availableNetworks = ['Polygon', 'Ethereum']; }
+        else if (s === 'BNB') { network = 'BSC'; tokenType = 'Native'; availableNetworks = ['BSC']; }
+        else if (s === 'ADA') { network = 'Cardano'; tokenType = 'Native'; }
+        else if (s === 'DOGE') { network = 'Dogecoin'; tokenType = 'Native'; }
+        else if (s === 'XRP') { network = 'XRPL'; tokenType = 'Native'; }
+        else if (s === 'TRX') { network = 'Tron'; tokenType = 'Native'; }
+        else if (s === 'LTC') { network = 'Litecoin'; tokenType = 'Native'; }
+
         return {
           id: coin.id,
-          symbol: coin.symbol.toUpperCase(),
+          symbol: s,
           name: coin.name,
           balance: 0, // Balance is user-specific, merged in App.tsx
           price: coin.current_price,
           change24h: parseFloat(coin.price_change_percentage_24h.toFixed(2)),
           color: color,
-          chartData: chartData
+          chartData: chartData,
+          network,
+          tokenType,
+          availableNetworks
         };
       });
 
@@ -99,7 +129,9 @@ export const cryptoService = {
     // Simulate network delay
     await new Promise(resolve => setTimeout(resolve, 500));
     
-    return [
+    const minted = JSON.parse(localStorage.getItem(MINTED_NFTS_KEY) || '[]');
+    
+    const defaults = [
       {
         id: 'nft_1',
         collectionName: 'Bored Ape Yacht Club',
@@ -149,5 +181,51 @@ export const cryptoService = {
         ]
       }
     ];
+
+    return [...minted, ...defaults];
+  },
+  
+  // Mint new NFT
+  mintNFT: async (nftData: Partial<NFT>): Promise<NFT> => {
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      const newNFT: NFT = {
+          id: 'mint_' + Date.now(),
+          collectionName: nftData.collectionName || 'Nova Creator Collection',
+          tokenId: '#' + Math.floor(Math.random() * 10000),
+          name: nftData.name || 'Untitled NFT',
+          imageUrl: nftData.imageUrl || '',
+          floorPrice: 0,
+          currency: nftData.chain === 'SOL' ? 'SOL' : 'ETH',
+          chain: (nftData.chain as any) || 'ETH',
+          description: nftData.description || '',
+          traits: nftData.traits || []
+      };
+      
+      const current = JSON.parse(localStorage.getItem(MINTED_NFTS_KEY) || '[]');
+      current.unshift(newNFT);
+      localStorage.setItem(MINTED_NFTS_KEY, JSON.stringify(current));
+      
+      return newNFT;
+  },
+
+  // Staking Data Mock
+  getStakingOptions: async (): Promise<StakingOption[]> => {
+    await new Promise(resolve => setTimeout(resolve, 200));
+    return [
+       { id: 'stake_1', assetSymbol: 'SOL', name: 'Solana Validator', apy: 7.5, minStake: 1, lockPeriodDays: 5, riskLevel: 'Low' },
+       { id: 'stake_2', assetSymbol: 'ETH', name: 'Lido Staked ETH', apy: 3.8, minStake: 0.1, lockPeriodDays: 0, riskLevel: 'Low' },
+       { id: 'stake_3', assetSymbol: 'USDC', name: 'Compound Lending', apy: 4.2, minStake: 50, lockPeriodDays: 0, riskLevel: 'Low' },
+       { id: 'stake_4', assetSymbol: 'DOT', name: 'Polkadot Nominator', apy: 14.5, minStake: 10, lockPeriodDays: 28, riskLevel: 'Medium' },
+       { id: 'stake_5', assetSymbol: 'ATOM', name: 'Cosmos Hub', apy: 18.2, minStake: 5, lockPeriodDays: 21, riskLevel: 'Medium' },
+       { id: 'stake_6', assetSymbol: 'DOGE', name: 'Doge Yield Farm', apy: 45.0, minStake: 1000, lockPeriodDays: 7, riskLevel: 'High' },
+    ];
+  },
+
+  getUserStakes: async (): Promise<StakingPosition[]> => {
+     await new Promise(resolve => setTimeout(resolve, 300));
+     return [
+        { id: 'pos_1', optionId: 'stake_1', amount: 45, rewardsEarned: 1.24, startDate: Date.now() - 1000000000 },
+        { id: 'pos_2', optionId: 'stake_3', amount: 1500, rewardsEarned: 12.50, startDate: Date.now() - 5000000000 }
+     ];
   }
 };

@@ -3,18 +3,19 @@ import React, { useState, useEffect } from 'react';
 import { ViewState, User, AppPermissions, ComplianceSettings } from '../types';
 import { authService } from '../services/authService';
 import { View, Text, TouchableOpacity, TextInput, Row, ScrollView } from '../components/native';
-import { ChevronLeft, Mail, Lock, User as UserIcon, Loader2, Key, Copy, CheckCircle, AlertTriangle, AtSign, XCircle, ShieldCheck, FileText, MapPin, Smartphone, CreditCard, Bell, Camera } from 'lucide-react';
+import { ChevronLeft, Mail, Lock, User as UserIcon, Loader2, Key, Copy, CheckCircle, AlertTriangle, AtSign, XCircle, ShieldCheck, ArrowRight, FileText, Eye, EyeOff } from 'lucide-react';
 
 interface SignupProps {
   onNavigate: (view: ViewState) => void;
   onSignupSuccess: (user: User) => void;
 }
 
+const STEPS = ['Legal', 'Identity', 'Verify', 'Secure'];
+
 export const Signup: React.FC<SignupProps> = ({ onNavigate, onSignupSuccess }) => {
   const [step, setStep] = useState<'legal' | 'form' | 'verify' | 'phrase'>('legal');
   
   // Legal & Permission State
-  const [legalAccepted, setLegalAccepted] = useState(false);
   const [complianceSettings, setComplianceSettings] = useState<ComplianceSettings>({
      termsAccepted: false,
      privacyPolicyAccepted: false,
@@ -23,14 +24,10 @@ export const Signup: React.FC<SignupProps> = ({ onNavigate, onSignupSuccess }) =
      agreedToDate: 0
   });
   
-  const [permissions, setPermissions] = useState<AppPermissions>({
-     camera: 'prompt',
-     photos: 'prompt',
-     microphone: 'prompt',
-     contacts: 'prompt',
-     location: 'prompt',
-     nfc: 'prompt',
-     notifications: 'prompt'
+  // Default permissions
+  const [permissions] = useState<AppPermissions>({
+     camera: 'prompt', photos: 'prompt', microphone: 'prompt', 
+     contacts: 'prompt', location: 'prompt', nfc: 'prompt', notifications: 'prompt'
   });
 
   // Form State
@@ -38,6 +35,7 @@ export const Signup: React.FC<SignupProps> = ({ onNavigate, onSignupSuccess }) =
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   
   // Verification State
   const [verificationCode, setVerificationCode] = useState('');
@@ -50,6 +48,7 @@ export const Signup: React.FC<SignupProps> = ({ onNavigate, onSignupSuccess }) =
   // Phrase State
   const [generatedPhrase, setGeneratedPhrase] = useState('');
   const [savedPhrase, setSavedPhrase] = useState(false);
+  const [phraseRevealed, setPhraseRevealed] = useState(false);
   
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -80,6 +79,12 @@ export const Signup: React.FC<SignupProps> = ({ onNavigate, onSignupSuccess }) =
     return () => clearTimeout(timeoutId);
   }, [username, step]);
 
+  const handleBack = () => {
+    if (step === 'legal') onNavigate(ViewState.WELCOME);
+    else if (step === 'form') setStep('legal');
+    else if (step === 'verify') setStep('form');
+  };
+
   const handleLegalAccept = () => {
      if (complianceSettings.termsAccepted && complianceSettings.privacyPolicyAccepted) {
          setComplianceSettings(prev => ({ ...prev, agreedToDate: Date.now() }));
@@ -87,34 +92,19 @@ export const Signup: React.FC<SignupProps> = ({ onNavigate, onSignupSuccess }) =
      }
   };
 
-  const handlePermissionToggle = (key: keyof AppPermissions) => {
-      setPermissions(prev => ({
-          ...prev,
-          [key]: prev[key] === 'granted' ? 'denied' : 'granted'
-      }));
-  };
-
   const handleCreateAccount = async () => {
     setError('');
-
     const finalUsername = username.startsWith('@') ? username : '@' + username;
-    if (!isUsernameAvailable) {
-      setError('Please choose a unique username');
-      return;
+    
+    if (!isUsernameAvailable && username.length >= 3) {
+        setError('Username taken');
+        return;
     }
 
     setIsLoading(true);
 
     try {
-      const result = await authService.signup(
-          name, 
-          email, 
-          password, 
-          finalUsername,
-          permissions,
-          complianceSettings
-      );
-      // Send verification email immediately
+      const result = await authService.signup(name, email, password, finalUsername, permissions, complianceSettings);
       await authService.sendEmailVerification(email);
       
       setTempUser(result.user);
@@ -130,7 +120,6 @@ export const Signup: React.FC<SignupProps> = ({ onNavigate, onSignupSuccess }) =
   const handleVerification = async () => {
     setVerifyError('');
     setIsLoading(true);
-
     try {
       if (tempUser) {
         await authService.verifyEmailCode(tempUser.id, verificationCode);
@@ -138,346 +127,265 @@ export const Signup: React.FC<SignupProps> = ({ onNavigate, onSignupSuccess }) =
         setStep('phrase');
       }
     } catch (err: any) {
-      setVerifyError('Invalid code. Try 123456'); // Hint for demo
+      setVerifyError('Invalid code');
       setIsLoading(false);
     }
   };
 
   const handleFinish = async () => {
     if (savedPhrase && tempUser) {
-      // Update session user to make sure verification status is current
       const currentUser = await authService.getCurrentUser();
-      if (currentUser) {
-          onSignupSuccess(currentUser);
-      } else {
-          onSignupSuccess(tempUser);
-      }
+      onSignupSuccess(currentUser || tempUser);
     }
   };
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(generatedPhrase);
+    alert("Copied to clipboard");
   };
 
-  // --- Step 0: Legal & Compliance ---
-  if (step === 'legal') {
-      return (
-          <View className="flex-1 h-full p-6">
-             <View className="mb-6">
-                <View className="w-12 h-12 bg-primary/20 rounded-2xl items-center justify-center mb-4">
-                    <ShieldCheck className="text-primary" size={24} />
-                </View>
-                <Text className="text-2xl font-bold mb-2">Legal & Permissions</Text>
-                <Text className="text-slate-400 text-sm">
-                   Please review and accept our legal terms and configure your device permissions to ensure a secure and compliant banking experience.
-                </Text>
+  const getStepIndex = () => {
+      if (step === 'legal') return 0;
+      if (step === 'form') return 1;
+      if (step === 'verify') return 2;
+      return 3;
+  };
+
+  return (
+    <View className="flex-1 h-full bg-[#050505] flex flex-col overflow-hidden">
+      {/* Background Gradient */}
+      <div className="absolute top-0 left-0 w-full h-[400px] bg-gradient-to-b from-indigo-900/20 to-transparent pointer-events-none" />
+      
+      {/* Header */}
+      <View className="pt-14 px-6 z-10 flex-row justify-between items-center">
+         <TouchableOpacity onPress={handleBack} className="w-10 h-10 rounded-full bg-white/5 border border-white/10 items-center justify-center active:bg-white/10 transition-colors">
+            <ChevronLeft size={20} className="text-white" />
+         </TouchableOpacity>
+         
+         {/* Step Indicators */}
+         <Row className="gap-2">
+             {[0, 1, 2, 3].map(i => (
+                 <div 
+                    key={i} 
+                    className={`h-1.5 rounded-full transition-all duration-500 ${
+                        getStepIndex() >= i ? 'w-8 bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.5)]' : 'w-2 bg-white/10'
+                    }`}
+                 />
+             ))}
+         </Row>
+      </View>
+
+      {/* Content Area */}
+      <View className="flex-1 px-6 pt-8 pb-safe-bottom">
+         
+         {/* --- STEP 1: LEGAL --- */}
+         {step === 'legal' && (
+             <View className="flex-1 flex-col animate-in slide-in-from-right duration-300">
+                <Text className="text-3xl font-bold text-white mb-2">Compliance</Text>
+                <Text className="text-slate-400 mb-8">Please review our terms to ensure a compliant experience.</Text>
+
+                <ScrollView className="flex-1 space-y-4" showsVerticalScrollIndicator={false}>
+                    {[
+                        { id: 'termsAccepted', title: 'Terms of Service', desc: 'I agree to the Terms of Service & User Agreement.' },
+                        { id: 'privacyPolicyAccepted', title: 'Privacy Policy', desc: 'I acknowledge the Privacy Policy and how my data is handled.' },
+                        { id: 'dataProcessingConsent', title: 'Data Processing', desc: 'I consent to the processing of my personal data for KYC.' },
+                    ].map((item) => (
+                        <TouchableOpacity 
+                           key={item.id}
+                           onPress={() => setComplianceSettings(prev => ({ ...prev, [item.id]: !prev[item.id as keyof ComplianceSettings] }))}
+                           className={`p-5 rounded-2xl border transition-all duration-200 ${
+                               complianceSettings[item.id as keyof ComplianceSettings] 
+                               ? 'bg-indigo-500/10 border-indigo-500/50' 
+                               : 'bg-white/5 border-white/10'
+                           }`}
+                        >
+                           <Row className="items-start gap-4">
+                               <div className={`w-6 h-6 rounded-full border flex items-center justify-center mt-1 transition-colors ${
+                                   complianceSettings[item.id as keyof ComplianceSettings] ? 'bg-indigo-500 border-indigo-500' : 'border-slate-600'
+                               }`}>
+                                   {complianceSettings[item.id as keyof ComplianceSettings] && <CheckCircle size={14} className="text-white" />}
+                               </div>
+                               <View className="flex-1">
+                                   <Text className="font-bold text-white mb-1">{item.title}</Text>
+                                   <Text className="text-xs text-slate-400 leading-relaxed">{item.desc}</Text>
+                               </View>
+                           </Row>
+                        </TouchableOpacity>
+                    ))}
+                </ScrollView>
+
+                <TouchableOpacity 
+                    onPress={handleLegalAccept}
+                    disabled={!complianceSettings.termsAccepted || !complianceSettings.privacyPolicyAccepted}
+                    className={`mt-6 w-full py-4 rounded-2xl items-center transition-all ${
+                        (!complianceSettings.termsAccepted || !complianceSettings.privacyPolicyAccepted) 
+                        ? 'bg-white/10 opacity-50' 
+                        : 'bg-indigo-600 shadow-lg shadow-indigo-600/20'
+                    }`}
+                >
+                    <Text className="font-bold text-white">Accept & Continue</Text>
+                </TouchableOpacity>
              </View>
+         )}
 
-             <ScrollView className="flex-1 pb-4">
-                 {/* Terms Box */}
-                 <View className="bg-surface border border-white/10 rounded-xl p-4 h-32 mb-4">
-                    <Text className="font-bold text-white mb-1 text-xs">1. Terms of Service</Text>
-                    <Text className="mb-2 text-xs text-slate-400">By accessing Nova Wallet, you agree to be bound by these Terms of Use, all applicable laws and regulations, and agree that you are responsible for compliance with any applicable local laws.</Text>
-                    <Text className="font-bold text-white mb-1 text-xs">2. Privacy & Data</Text>
-                    <Text className="text-xs text-slate-400">We prioritize your privacy. We collect minimal data required for regulatory compliance (KYC/AML) and to provide core services. Your private keys are never stored on our servers.</Text>
+         {/* --- STEP 2: FORM --- */}
+         {step === 'form' && (
+             <View className="flex-1 flex-col animate-in slide-in-from-right duration-300">
+                 <View className="mb-8">
+                     <Text className="text-3xl font-bold text-white mb-2">Create ID</Text>
+                     <Text className="text-slate-400">Claim your unique Web3 identity.</Text>
                  </View>
 
-                 <View className="space-y-3 mb-4">
-                    <TouchableOpacity 
-                       onPress={() => setComplianceSettings(prev => ({...prev, termsAccepted: !prev.termsAccepted}))}
-                       className="flex-row items-start gap-3"
-                    >
-                        <View className={`w-5 h-5 rounded border mt-0.5 items-center justify-center ${complianceSettings.termsAccepted ? 'bg-primary border-primary' : 'border-slate-600'}`}>
-                           {complianceSettings.termsAccepted && <CheckCircle size={14} className="text-white" />}
-                        </View>
-                        <Text className="text-sm text-slate-300 flex-1">I agree to the <Text className="text-primary font-bold">Terms of Service</Text>.</Text>
-                    </TouchableOpacity>
-                    
-                    <TouchableOpacity 
-                       onPress={() => setComplianceSettings(prev => ({...prev, privacyPolicyAccepted: !prev.privacyPolicyAccepted}))}
-                       className="flex-row items-start gap-3"
-                    >
-                        <View className={`w-5 h-5 rounded border mt-0.5 items-center justify-center ${complianceSettings.privacyPolicyAccepted ? 'bg-primary border-primary' : 'border-slate-600'}`}>
-                           {complianceSettings.privacyPolicyAccepted && <CheckCircle size={14} className="text-white" />}
-                        </View>
-                        <Text className="text-sm text-slate-300 flex-1">I acknowledge the <Text className="text-primary font-bold">Privacy Policy</Text>.</Text>
-                    </TouchableOpacity>
+                 <ScrollView className="flex-1 space-y-5">
+                     <View className="space-y-2">
+                         <Text className="text-xs font-bold text-slate-500 uppercase ml-1">Full Name</Text>
+                         <View className="bg-white/5 border border-white/10 rounded-2xl px-4 flex-row items-center h-14 focus-within:border-indigo-500/50 focus-within:bg-white/10 transition-all">
+                             <UserIcon size={18} className="text-slate-500 mr-3" />
+                             <TextInput value={name} onChange={(e) => setName(e.target.value)} placeholder="John Doe" className="flex-1 h-full text-white bg-transparent outline-none" placeholderTextColor="#64748b" />
+                         </View>
+                     </View>
 
-                    <TouchableOpacity 
-                       onPress={() => setComplianceSettings(prev => ({...prev, dataProcessingConsent: !prev.dataProcessingConsent}))}
-                       className="flex-row items-start gap-3"
-                    >
-                        <View className={`w-5 h-5 rounded border mt-0.5 items-center justify-center ${complianceSettings.dataProcessingConsent ? 'bg-primary border-primary' : 'border-slate-600'}`}>
-                           {complianceSettings.dataProcessingConsent && <CheckCircle size={14} className="text-white" />}
-                        </View>
-                        <Text className="text-sm text-slate-300 flex-1">I consent to data processing for fraud prevention.</Text>
-                    </TouchableOpacity>
-                 </View>
+                     <View className="space-y-2">
+                         <Text className="text-xs font-bold text-slate-500 uppercase ml-1">Username</Text>
+                         <View className={`bg-white/5 border rounded-2xl px-4 flex-row items-center h-14 transition-all ${
+                             isUsernameAvailable === true ? 'border-emerald-500/50' : isUsernameAvailable === false ? 'border-red-500/50' : 'border-white/10 focus-within:border-indigo-500/50'
+                         }`}>
+                             <AtSign size={18} className="text-slate-500 mr-3" />
+                             <TextInput value={username} onChange={(e) => setUsername(e.target.value)} placeholder="nova_user" className="flex-1 h-full text-white bg-transparent outline-none" autoCapitalize="none" placeholderTextColor="#64748b" />
+                             {isCheckingUsername ? <Loader2 size={16} className="animate-spin text-slate-500" /> : isUsernameAvailable === true ? <CheckCircle size={16} className="text-emerald-500" /> : isUsernameAvailable === false ? <XCircle size={16} className="text-red-500" /> : null}
+                         </View>
+                     </View>
 
-                 <View className="border-t border-white/10 pt-4 space-y-4">
-                    <Text className="font-bold text-sm text-slate-400 uppercase tracking-wider mb-2">Device Permissions</Text>
-                    
-                    <View className="gap-3">
-                        {[
-                            { key: 'nfc', label: 'NFC (Payments)', icon: CreditCard, desc: 'Required for Tap-to-Pay features.' },
-                            { key: 'location', label: 'Location', icon: MapPin, desc: 'Required for fraud protection & regional compliance.' },
-                            { key: 'notifications', label: 'Notifications', icon: Bell, desc: 'Receive transaction alerts & security codes.' },
-                            { key: 'contacts', label: 'Contacts', icon: Smartphone, desc: 'Find friends to send payments to.' },
-                            { key: 'camera', label: 'Camera', icon: Camera, desc: 'Scan QR codes and KYC verification.' }
-                        ].map((item) => {
-                            const Icon = item.icon;
-                            return (
-                                <View key={item.key} className="flex-row items-center justify-between p-3 bg-surface/50 rounded-xl border border-white/5">
-                                    <Row className="items-center gap-3">
-                                        <View className="p-2 bg-slate-800 rounded-lg">
-                                            <Icon size={16} className="text-slate-400" />
-                                        </View>
-                                        <View>
-                                            <Text className="font-bold text-sm">{item.label}</Text>
-                                            <Text className="text-[10px] text-slate-500">{item.desc}</Text>
-                                        </View>
-                                    </Row>
-                                    <TouchableOpacity 
-                                    onPress={() => handlePermissionToggle(item.key as keyof AppPermissions)}
-                                    className={`w-10 h-6 rounded-full relative ${permissions[item.key as keyof AppPermissions] === 'granted' ? 'bg-emerald-500' : 'bg-slate-700'}`}
-                                    >
-                                        <View className={`absolute top-1 w-4 h-4 bg-white rounded-full ${permissions[item.key as keyof AppPermissions] === 'granted' ? 'left-5' : 'left-1'}`} />
-                                    </TouchableOpacity>
-                                </View>
-                            );
-                        })}
-                    </View>
-                 </View>
-             </ScrollView>
+                     <View className="space-y-2">
+                         <Text className="text-xs font-bold text-slate-500 uppercase ml-1">Email</Text>
+                         <View className="bg-white/5 border border-white/10 rounded-2xl px-4 flex-row items-center h-14 focus-within:border-indigo-500/50 focus-within:bg-white/10 transition-all">
+                             <Mail size={18} className="text-slate-500 mr-3" />
+                             <TextInput type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@example.com" className="flex-1 h-full text-white bg-transparent outline-none" placeholderTextColor="#64748b" />
+                         </View>
+                     </View>
 
-             <View className="mt-4">
-                 <TouchableOpacity
-                   onPress={handleLegalAccept}
-                   disabled={!complianceSettings.termsAccepted || !complianceSettings.privacyPolicyAccepted}
-                   className="w-full bg-primary py-4 rounded-xl shadow-lg items-center justify-center"
+                     <View className="space-y-2">
+                         <Text className="text-xs font-bold text-slate-500 uppercase ml-1">Password</Text>
+                         <View className="bg-white/5 border border-white/10 rounded-2xl px-4 flex-row items-center h-14 focus-within:border-indigo-500/50 focus-within:bg-white/10 transition-all">
+                             <Lock size={18} className="text-slate-500 mr-3" />
+                             <TextInput type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" className="flex-1 h-full text-white bg-transparent outline-none" placeholderTextColor="#64748b" />
+                             <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+                                 {showPassword ? <EyeOff size={18} className="text-slate-500" /> : <Eye size={18} className="text-slate-500" />}
+                             </TouchableOpacity>
+                         </View>
+                     </View>
+
+                     {error ? <Text className="text-red-400 text-sm text-center bg-red-500/10 p-2 rounded-lg">{error}</Text> : null}
+                 </ScrollView>
+
+                 <TouchableOpacity 
+                    onPress={handleCreateAccount}
+                    disabled={isLoading || !name || !username || !email || !password || isUsernameAvailable === false}
+                    className="mt-4 w-full h-14 bg-indigo-600 rounded-2xl flex-row items-center justify-center gap-2 shadow-lg shadow-indigo-500/20 disabled:opacity-50 disabled:shadow-none"
                  >
-                    <Text className="text-white font-bold">Accept & Continue</Text>
+                    {isLoading ? <Loader2 className="animate-spin text-white" /> : <><Text className="font-bold text-white text-lg">Create Account</Text><ArrowRight size={20} className="text-white" /></>}
                  </TouchableOpacity>
              </View>
-          </View>
-      );
-  }
+         )}
 
-  // Step 2: Email Verification
-  if (step === 'verify') {
-    return (
-      <View className="flex-1 h-full p-6 items-center justify-center">
-        <View className="w-16 h-16 bg-blue-500/20 rounded-full items-center justify-center mb-6">
-          <ShieldCheck className="text-blue-400" size={32} />
-        </View>
-        <Text className="text-2xl font-bold mb-2">Verify Email</Text>
-        <Text className="text-slate-400 text-center text-sm mb-8">
-          We sent a 6-digit code to <Text className="text-white font-medium">{email}</Text>.
-          {'\n'}(Demo: Use 123456)
-        </Text>
+         {/* --- STEP 3: VERIFY --- */}
+         {step === 'verify' && (
+             <View className="flex-1 flex-col items-center justify-center animate-in slide-in-from-right duration-300">
+                 <div className="w-24 h-24 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center mb-8 animate-pulse">
+                     <Mail size={40} className="text-indigo-400" />
+                 </div>
+                 <Text className="text-3xl font-bold text-white mb-2">Check Email</Text>
+                 <Text className="text-slate-400 text-center max-w-xs mb-10">
+                    We've sent a 6-digit code to <span className="text-white font-bold">{email}</span>.
+                 </Text>
 
-        <View className="w-full space-y-6">
-          <View>
-             <TextInput
-              value={verificationCode}
-              onChange={(e) => setVerificationCode(e.target.value.replace(/[^0-9]/g, ''))}
-              className="w-full bg-surface border border-white/10 rounded-2xl py-4 text-center text-2xl font-mono tracking-widest text-white"
-              placeholder="000000"
-              maxLength={6}
-            />
-          </View>
+                 <TextInput 
+                    value={verificationCode}
+                    onChange={(e) => setVerificationCode(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
+                    className="bg-transparent text-5xl font-mono text-white tracking-[0.5em] text-center w-full outline-none border-b-2 border-indigo-500/50 focus:border-indigo-500 pb-4 mb-8"
+                    placeholder="000000"
+                    placeholderTextColor="#334155"
+                    autoFocus
+                 />
 
-          {verifyError ? (
-            <View className="p-3 bg-red-500/10 rounded-lg">
-                <Text className="text-red-400 text-sm text-center">{verifyError}</Text>
-            </View>
-          ) : null}
+                 {verifyError ? <Text className="text-red-400 mb-6">{verifyError}</Text> : null}
 
-          <TouchableOpacity
-            onPress={handleVerification}
-            disabled={isLoading || verificationCode.length !== 6}
-            className="w-full bg-primary py-3.5 rounded-xl shadow-lg items-center justify-center"
-          >
-             {isLoading ? <Loader2 className="animate-spin text-white" size={20} /> : <Text className="text-white font-bold">Verify</Text>}
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
+                 <TouchableOpacity 
+                    onPress={handleVerification}
+                    disabled={isLoading || verificationCode.length !== 6}
+                    className="w-full h-14 bg-white text-black rounded-2xl items-center justify-center shadow-lg disabled:opacity-50"
+                 >
+                    {isLoading ? <Loader2 className="animate-spin text-black" /> : <Text className="font-bold text-lg text-black">Verify Code</Text>}
+                 </TouchableOpacity>
+             </View>
+         )}
 
-  // Step 3: Recovery Phrase
-  if (step === 'phrase') {
-    return (
-      <View className="flex-1 h-full p-6">
-        <View className="space-y-2 mb-6">
-           <View className="w-12 h-12 bg-yellow-500/20 rounded-full items-center justify-center mb-2">
-             <Key className="text-yellow-500" size={24} />
-           </View>
-           <Text className="text-2xl font-bold">Secret Recovery Phrase</Text>
-           <Row className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-xl gap-3">
-             <AlertTriangle className="text-yellow-500" size={20} />
-             <Text className="text-xs text-yellow-200/80 leading-relaxed flex-1">
-               This is the <Text className="font-bold text-white">ONLY</Text> way to recover your wallet. 
-               Write it down and store it safely. We cannot recover it for you.
-             </Text>
-           </Row>
-        </View>
+         {/* --- STEP 4: PHRASE --- */}
+         {step === 'phrase' && (
+             <View className="flex-1 flex-col animate-in slide-in-from-right duration-300">
+                 <View className="mb-6">
+                     <Row className="items-center gap-3 mb-2">
+                         <ShieldCheck size={28} className="text-yellow-500" />
+                         <Text className="text-2xl font-bold text-white">Secret Vault Key</Text>
+                     </Row>
+                     <View className="bg-yellow-500/10 border border-yellow-500/20 p-4 rounded-xl">
+                         <Text className="text-xs text-yellow-200 leading-relaxed">
+                            ⚠️ <span className="font-bold">CRITICAL:</span> Write this down. If you lose this phrase, your funds are lost forever. We cannot recover it.
+                         </Text>
+                     </View>
+                 </View>
 
-        {/* Phrase Grid */}
-        <View className="grid grid-cols-3 gap-2 mb-4">
-          {generatedPhrase.split(' ').map((word, index) => (
-            <View key={index} className="bg-surface border border-white/5 rounded-lg p-2 items-center relative">
-              <Text className="absolute top-1 left-2 text-[10px] text-slate-500">{index + 1}</Text>
-              <Text className="text-sm font-medium text-white">{word}</Text>
-            </View>
-          ))}
-        </View>
+                 <View className="flex-1 bg-black/40 border border-white/10 rounded-3xl p-1 relative overflow-hidden group">
+                     {/* Blurring Overlay */}
+                     {!phraseRevealed && (
+                         <div className="absolute inset-0 z-20 bg-black/80 backdrop-blur-xl flex flex-col items-center justify-center">
+                             <Lock size={32} className="text-slate-400 mb-4" />
+                             <Text className="text-slate-300 text-sm font-bold mb-4">Tap to reveal your key</Text>
+                             <TouchableOpacity onPress={() => setPhraseRevealed(true)} className="px-6 py-2 bg-white/10 border border-white/10 rounded-full">
+                                 <Text className="text-white text-xs font-bold">Reveal</Text>
+                             </TouchableOpacity>
+                         </div>
+                     )}
+                     
+                     <ScrollView className="h-full p-4" contentContainerStyle="pb-4">
+                         <View className="flex-row flex-wrap gap-3 justify-center">
+                             {generatedPhrase.split(' ').map((word, i) => (
+                                 <div key={i} className="px-3 py-2 bg-white/5 border border-white/5 rounded-lg flex items-center gap-2">
+                                     <span className="text-[10px] text-slate-500 font-mono select-none">{i+1}</span>
+                                     <span className="text-sm font-bold text-white select-all">{word}</span>
+                                 </div>
+                             ))}
+                         </View>
+                     </ScrollView>
+                     
+                     {phraseRevealed && (
+                         <div className="absolute bottom-4 right-4 z-20">
+                             <TouchableOpacity onPress={copyToClipboard} className="p-3 bg-indigo-600 rounded-xl shadow-lg">
+                                 <Copy size={18} className="text-white" />
+                             </TouchableOpacity>
+                         </div>
+                     )}
+                 </View>
 
-        <TouchableOpacity 
-          onPress={copyToClipboard}
-          className="flex-row items-center justify-center gap-2 mb-8"
-        >
-          <Copy size={14} className="text-primary" /> 
-          <Text className="text-primary text-sm font-medium">Copy to clipboard</Text>
-        </TouchableOpacity>
+                 <View className="mt-6">
+                     <TouchableOpacity onPress={() => setSavedPhrase(!savedPhrase)} className="flex-row items-center gap-3 mb-4 p-2">
+                         <div className={`w-6 h-6 rounded-lg border flex items-center justify-center transition-colors ${savedPhrase ? 'bg-emerald-500 border-emerald-500' : 'border-slate-600 bg-white/5'}`}>
+                             {savedPhrase && <CheckCircle size={14} className="text-white" />}
+                         </div>
+                         <Text className="text-sm text-slate-300 flex-1">I have saved these 12 words in a secure location.</Text>
+                     </TouchableOpacity>
 
-        <View className="mt-auto space-y-4">
-          <TouchableOpacity 
-             onPress={() => setSavedPhrase(!savedPhrase)}
-             className="flex-row items-center gap-3"
-          >
-            <View className={`w-5 h-5 rounded border items-center justify-center ${savedPhrase ? 'bg-emerald-500 border-emerald-500' : 'border-slate-500'}`}>
-              {savedPhrase && <CheckCircle size={14} className="text-white" />}
-            </View>
-            <Text className="text-sm text-slate-300">
-              I have saved my recovery phrase in a secure location.
-            </Text>
-          </TouchableOpacity>
+                     <TouchableOpacity 
+                        onPress={handleFinish}
+                        disabled={!savedPhrase}
+                        className="w-full h-14 bg-emerald-500 rounded-2xl items-center justify-center shadow-lg shadow-emerald-500/20 disabled:bg-slate-800 disabled:shadow-none"
+                     >
+                        <Text className="font-bold text-white text-lg">Enter Wallet</Text>
+                     </TouchableOpacity>
+                 </View>
+             </View>
+         )}
 
-          <TouchableOpacity
-            onPress={handleFinish}
-            disabled={!savedPhrase}
-            className="w-full bg-primary py-3.5 rounded-xl shadow-lg items-center justify-center"
-          >
-            <Text className="text-white font-bold">Enter Wallet</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
-
-  // Step 1: Initial Form
-  return (
-    <View className="flex-1 h-full p-6">
-      <TouchableOpacity 
-        onPress={() => setStep('legal')}
-        className="flex-row items-center gap-1 mb-6"
-      >
-        <ChevronLeft size={20} className="text-slate-400" /> 
-        <Text className="text-slate-400">Back</Text>
-      </TouchableOpacity>
-
-      <View className="space-y-2 mb-6">
-        <Text className="text-3xl font-bold">Create Account</Text>
-        <Text className="text-slate-400">Claim your unique Web3 identity.</Text>
-      </View>
-
-      <View className="space-y-4">
-        
-        {/* Name */}
-        <View className="space-y-2">
-          <Text className="text-sm font-medium text-slate-300">Full Name</Text>
-          <View className="relative">
-            <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
-            <TextInput
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full bg-surface border border-white/10 rounded-xl py-3.5 pl-11 pr-4 text-white"
-              placeholder="John Doe"
-            />
-          </View>
-        </View>
-
-        {/* Username */}
-        <View className="space-y-2">
-          <Text className="text-sm font-medium text-slate-300">Username</Text>
-          <View className="relative">
-            <AtSign className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
-            <TextInput
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className={`w-full bg-surface border rounded-xl py-3.5 pl-11 pr-10 text-white ${
-                isUsernameAvailable === true ? 'border-emerald-500/50' : isUsernameAvailable === false ? 'border-red-500/50' : 'border-white/10'
-              }`}
-              placeholder="nedeleden"
-            />
-            <View className="absolute right-4 top-1/2 -translate-y-1/2">
-              {isCheckingUsername ? (
-                <Loader2 className="animate-spin text-slate-500" size={16} />
-              ) : isUsernameAvailable === true ? (
-                <CheckCircle className="text-emerald-500" size={16} />
-              ) : isUsernameAvailable === false ? (
-                <XCircle className="text-red-500" size={16} />
-              ) : null}
-            </View>
-          </View>
-          {isUsernameAvailable === false && (
-             <Text className="text-xs text-red-400">Username is already taken.</Text>
-          )}
-        </View>
-
-        {/* Email */}
-        <View className="space-y-2">
-          <Text className="text-sm font-medium text-slate-300">Email Address</Text>
-          <View className="relative">
-            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
-            <TextInput
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-surface border border-white/10 rounded-xl py-3.5 pl-11 pr-4 text-white"
-              placeholder="name@example.com"
-            />
-          </View>
-        </View>
-
-        {/* Password */}
-        <View className="space-y-2">
-          <Text className="text-sm font-medium text-slate-300">Password</Text>
-          <View className="relative">
-            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
-            <TextInput
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-surface border border-white/10 rounded-xl py-3.5 pl-11 pr-4 text-white"
-              placeholder="••••••••"
-            />
-          </View>
-        </View>
-
-        {error ? (
-          <View className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg mt-2">
-            <Text className="text-red-400 text-sm text-center">{error}</Text>
-          </View>
-        ) : null}
-
-        <TouchableOpacity
-          onPress={handleCreateAccount}
-          disabled={isLoading || isUsernameAvailable === false}
-          className="w-full bg-primary py-3.5 rounded-xl shadow-lg items-center justify-center mt-4"
-        >
-          {isLoading ? <Loader2 className="animate-spin text-white" size={20} /> : <Text className="text-white font-bold">Create Account</Text>}
-        </TouchableOpacity>
-      </View>
-      
-      <View className="mt-auto pt-6 items-center">
-          <Row className="gap-1">
-            <Text className="text-slate-400 text-sm">Already have an account?</Text>
-            <TouchableOpacity onPress={() => onNavigate(ViewState.LOGIN)}>
-                <Text className="text-white font-semibold text-sm">Sign In</Text>
-            </TouchableOpacity>
-          </Row>
       </View>
     </View>
   );

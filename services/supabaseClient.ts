@@ -2,9 +2,11 @@
 import { createClient } from '@supabase/supabase-js';
 
 // Access environment variables
-// Note: In a real production build, these should be in a .env file.
-// For this environment, we assume they are injected or we provide placeholders to prevent crashing.
 const supabaseUrl = process.env.SUPABASE_URL || 'https://placeholder.supabase.co';
 const supabaseKey = process.env.SUPABASE_KEY || 'placeholder-key';
+
+// Determine if we should use mock services
+// We default to true if the URL is the placeholder
+export const isMockMode = supabaseUrl.includes('placeholder');
 
 export const supabase = createClient(supabaseUrl, supabaseKey);

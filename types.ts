@@ -1,4 +1,5 @@
 
+
 export enum ViewState {
   // Auth Views
   WELCOME = 'WELCOME',
@@ -12,41 +13,72 @@ export enum ViewState {
   WALLET = 'WALLET',
   MESSAGES = 'MESSAGES',
   CHAT = 'CHAT',
-  DARK_BROWSER = 'DARK_BROWSER',
   
   // Transaction Views
   ASSET_DETAILS = 'ASSET_DETAILS',
-  NFT_DETAILS = 'NFT_DETAILS', // New
+  NFT_DETAILS = 'NFT_DETAILS',
   SEND = 'SEND',
   RECEIVE = 'RECEIVE',
+  CARD_DETAILS = 'CARD_DETAILS',
+  BUY = 'BUY',
+  
+  // Web3 Advanced (Paused Modules)
   SWAP = 'SWAP',
+  EARN = 'EARN',
+  GOVERNANCE = 'GOVERNANCE',
+  DARK_BROWSER = 'DARK_BROWSER',
+  CREATOR_STUDIO = 'CREATOR_STUDIO',
+  CONNECTED_APPS = 'CONNECTED_APPS',
+  CONNECT_REQUEST = 'CONNECT_REQUEST',
+  SIGN_REQUEST = 'SIGN_REQUEST',
+
+  // P2P
+  P2P_MARKET = 'P2P_MARKET',
+  P2P_ORDER = 'P2P_ORDER',
   
   // Profile Ecosystem
   PROFILE = 'PROFILE',
   SETTINGS = 'SETTINGS',
   AFFILIATE = 'AFFILIATE',
   NEWS = 'NEWS',
-  CONNECTED_APPS = 'CONNECTED_APPS',
-  CONNECT_REQUEST = 'CONNECT_REQUEST',
+  
+  // Security Suite
+  SECURITY = 'SECURITY',
+  DEVICES = 'DEVICES',
+  BACKUP = 'BACKUP',
   
   // New Sections
-  SECURITY = 'SECURITY',
-  LEGAL = 'LEGAL', // KYC & Compliance
+  LEGAL = 'LEGAL',
   NOTIFICATIONS = 'NOTIFICATIONS',
   SUPPORT = 'SUPPORT'
+}
+
+export interface DeviceSession {
+  id: string;
+  deviceName: string;
+  deviceType: 'mobile' | 'desktop' | 'tablet';
+  ipAddress: string;
+  location: string;
+  lastActive: number;
+  isCurrent: boolean;
 }
 
 export interface UserSettings {
   currency: 'USD' | 'EUR' | 'GBP' | 'JPY';
   biometricsEnabled: boolean;
   hideBalances: boolean;
-  autoLockTimer: number; // minutes
+  autoLockTimer: number;
   antiPhishingCode?: string;
   notifications: {
     priceAlerts: boolean;
     news: boolean;
     security: boolean;
     marketing: boolean;
+  };
+  backup?: {
+    cloudEnabled: boolean;
+    lastBackup?: number;
+    guardians?: string[];
   };
 }
 
@@ -63,9 +95,9 @@ export interface Group {
   id: string;
   name: string;
   type: 'private' | 'public';
-  members: string[]; // User IDs
-  admins: string[]; // User IDs
-  icon: string; // Emoji or URL
+  members: string[];
+  admins: string[];
+  icon: string;
   description?: string;
   lastMessage?: string;
   lastMessageTime?: number;
@@ -73,18 +105,26 @@ export interface Group {
 
 export interface Attachment {
   id: string;
-  type: 'image' | 'video';
-  url: string; // Base64 or URL
+  type: 'image' | 'video' | 'audio' | 'transfer' | 'invoice';
+  url?: string;
   fileName?: string;
   fileSize?: number;
+  duration?: number;
+  metadata?: {
+    amount: number;
+    symbol: string;
+    valueUsd: number;
+    status: 'pending' | 'completed' | 'cancelled';
+    description?: string;
+  }
 }
 
 export interface Message {
   id: string;
   senderId: string;
-  receiverId: string; // User ID or Group ID
+  receiverId: string;
   isGroup?: boolean;
-  text: string; // Encrypted string
+  text: string;
   attachments?: Attachment[];
   timestamp: number;
   isEphemeral: boolean;
@@ -95,13 +135,13 @@ export interface ConnectedApp {
   id: string;
   name: string;
   domain: string;
-  icon: string; // Emoji or URL
-  permissions: string[]; // e.g. ['view_profile', 'view_balance']
+  icon: string;
+  permissions: string[];
   connectedAt: number;
 }
 
 export interface VendorStats {
-  rating: number; // 0-5
+  rating: number;
   reviewCount: number;
   totalSales: number;
   joinedDate: string;
@@ -128,21 +168,42 @@ export interface ComplianceSettings {
   agreedToDate: number;
 }
 
+export interface CardTransaction {
+   id: string;
+   merchant: string;
+   amount: number;
+   currency: string;
+   category: 'shopping' | 'food' | 'travel' | 'services' | 'topup';
+   date: number;
+   type: 'purchase' | 'refund' | 'topup';
+   status: 'pending' | 'completed' | 'declined';
+   icon?: string;
+}
+
 export interface BankingCard {
   id: string;
   last4: string;
   expiry: string;
+  cvv: string;
   holderName: string;
   network: 'Visa' | 'Mastercard';
   type: 'Debit' | 'Credit';
   color: 'blue' | 'black' | 'gold';
+  balance: number;
+  currency: string;
   isFrozen: boolean;
+  settings: {
+     onlinePayments: boolean;
+     international: boolean;
+     monthlyLimit: number;
+     roundUpToSavings: boolean;
+  };
+  transactions?: CardTransaction[];
 }
 
-// New Interfaces for Security & Legal
 export interface ActivityLog {
   id: string;
-  action: string; // "Login", "Withdrawal", "Password Change"
+  action: string;
   ipAddress: string;
   device: string;
   location: string;
@@ -168,7 +229,7 @@ export interface SupportTicket {
 }
 
 export interface KYCState {
-  level: 0 | 1 | 2 | 3; // 0: Unverified, 1: Basic, 2: ID Verified, 3: Fully Verified
+  level: 0 | 1 | 2 | 3;
   status: 'unverified' | 'pending' | 'verified' | 'rejected';
   documents: {
     type: 'passport' | 'license' | 'id_card';
@@ -180,17 +241,18 @@ export interface KYCState {
 export interface User {
   id: string;
   name: string;
-  username: string; // Unique handle e.g. @nedeleden
+  username: string;
   email: string;
+  walletAddress: string;
   phoneNumber?: string;
   isEmailVerified: boolean;
   isPhoneVerified: boolean;
-  kyc: KYCState; // New
-  profileImage?: string; // Base64 or URL
+  kyc: KYCState;
+  profileImage?: string;
   recoveryPhrase?: string;
   joinedDate: string;
-  friends: string[]; // Array of User IDs
-  groups?: string[]; // Array of Group IDs
+  friends: string[];
+  groups?: string[];
   connectedApps: ConnectedApp[];
   settings: UserSettings;
   permissions: AppPermissions;
@@ -213,13 +275,15 @@ export interface Asset {
   change24h: number;
   color: string;
   chartData: { value: number }[];
+  network: string;
+  tokenType?: string;
+  availableNetworks?: string[];
 }
 
-// NFT Interfaces
 export interface NFTTrait {
   type: string;
   value: string;
-  rarity?: number; // percentage
+  rarity?: number;
 }
 
 export interface NFT {
@@ -228,7 +292,7 @@ export interface NFT {
   tokenId: string;
   name: string;
   imageUrl: string;
-  floorPrice: number; // in ETH/SOL
+  floorPrice: number;
   currency: string;
   traits: NFTTrait[];
   description: string;
@@ -263,18 +327,16 @@ export interface NewsItem {
   sentiment: 'Positive' | 'Negative' | 'Neutral';
 }
 
-// Market Interfaces
-
 export interface GeoLocation {
   lat: number;
   lng: number;
-  address: string; // e.g. "New York, NY" or "Berlin, Germany"
+  address: string;
   isLocalPickupAvailable: boolean;
 }
 
 export interface ShippingOption {
   id: string;
-  name: string; // e.g. "Standard Shipping", "Express"
+  name: string;
   priceUsd: number;
   estimatedDays: string;
 }
@@ -294,7 +356,7 @@ export interface Product {
   title: string;
   description: string;
   price: number;
-  currency: string; // e.g., 'USDC', 'ETH'
+  currency: string;
   images: string[];
   category: string;
   subcategory: string;
@@ -305,4 +367,168 @@ export interface Product {
   createdAt: number;
 }
 
-export type CallState = 'idle' | 'calling' | 'connected' | 'ended';
+export type OrderStatus = 'processing' | 'shipped' | 'delivered' | 'disputed';
+
+export interface Order {
+  id: string;
+  productId: string;
+  productTitle: string;
+  productImage: string;
+  price: number;
+  currency: string;
+  buyerId: string;
+  sellerId: string;
+  date: number;
+  status: OrderStatus;
+  shippingMethod: string;
+  trackingNumber?: string;
+}
+
+export type CallStatus = 'incoming' | 'outgoing' | 'active' | 'minimized' | 'ended';
+
+export interface CallSession {
+    id: string;
+    partnerId: string;
+    partnerName: string;
+    partnerImage?: string;
+    isVideo: boolean;
+    status: CallStatus;
+    startTime?: number;
+}
+
+export interface P2POffer {
+  id: string;
+  traderName: string;
+  traderRating: number;
+  tradesCount: number;
+  type: 'buy' | 'sell';
+  asset: string;
+  currency: string;
+  price: number;
+  minLimit: number;
+  maxLimit: number;
+  paymentMethods: string[];
+  isOnline: boolean;
+}
+
+export interface P2PTrade {
+  id: string;
+  offerId: string;
+  type: 'buy' | 'sell';
+  asset: string;
+  currency: string;
+  fiatAmount: number;
+  cryptoAmount: number;
+  price: number;
+  status: 'created' | 'paid' | 'released' | 'disputed' | 'cancelled';
+  traderName: string;
+  paymentDetails?: {
+    method: string;
+    accountName: string;
+    accountNumber: string;
+    bankName?: string;
+  };
+  chatId: string;
+  createdAt: number;
+}
+
+export interface FiatQuote {
+    providerId: string;
+    providerName: string;
+    providerLogo: string;
+    cryptoAmount: number;
+    fiatAmount: number;
+    fiatCurrency: string;
+    fee: number;
+    rate: number;
+    deliveryTime: string;
+    paymentMethods: string[];
+    isBestRate: boolean;
+}
+
+export interface BrowserTab {
+  id: string;
+  url: string;
+  title: string;
+  isActive: boolean;
+  isLoading: boolean;
+}
+
+export type Chain = 'Ethereum' | 'Solana' | 'Bitcoin' | 'Polygon' | 'BSC' | 'Optimism' | 'Arbitrum';
+
+export interface DAppTransaction {
+  dAppName: string;
+  dAppUrl: string;
+  dAppIcon?: string;
+  action: 'swap' | 'approve' | 'sign';
+  network: string;
+  details: {
+    fromAmount?: number;
+    fromSymbol?: string;
+    toAmount?: number;
+    toSymbol?: string;
+    gasFee?: number;
+  };
+}
+
+export interface StakingOption {
+  id: string;
+  assetSymbol: string;
+  name: string;
+  apy: number;
+  minStake: number;
+  lockPeriodDays: number;
+  riskLevel: 'Low' | 'Medium' | 'High';
+}
+
+export interface StakingPosition {
+  id: string;
+  optionId: string;
+  amount: number;
+  rewardsEarned: number;
+  startDate: number;
+}
+
+export interface SwapRoute {
+  id: string;
+  providerName: string;
+  providerIcon: string;
+  type: 'DEX' | 'BRIDGE';
+  inputAmount: number;
+  outputAmount: number;
+  gasFeeUsd: number;
+  estimatedTimeSeconds: number;
+  steps: string[];
+  tags?: string[];
+}
+
+export interface LimitOrder {
+  id: string;
+  fromSymbol: string;
+  toSymbol: string;
+  amount: number;
+  targetPrice: number;
+  expiry: number;
+  status: 'open' | 'filled' | 'cancelled';
+  createdAt: number;
+}
+
+export interface Proposal {
+  id: string;
+  daoName: string;
+  daoIcon: string;
+  assetSymbol: string;
+  title: string;
+  description: string;
+  startDate: number;
+  endDate: number;
+  status: 'Active' | 'Pending' | 'Closed' | 'Passed' | 'Rejected';
+  totalVotes: number;
+  userVotingPower: number;
+  userVotedOptionId?: string;
+  options: {
+    id: string;
+    label: string;
+    votes: number;
+  }[];
+}

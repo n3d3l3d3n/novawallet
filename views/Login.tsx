@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { ViewState } from '../types';
 import { authService } from '../services/authService';
 import { View, Text, TouchableOpacity, TextInput, Row } from '../components/native';
-import { ChevronLeft, Mail, Lock, Loader2, Key } from 'lucide-react';
+import { ChevronLeft, Mail, Lock, Loader2, Key, ArrowRight, ShieldCheck, Wallet } from 'lucide-react';
 
 interface LoginProps {
   onNavigate: (view: ViewState) => void;
@@ -43,115 +43,159 @@ export const Login: React.FC<LoginProps> = ({ onNavigate, onLoginSuccess }) => {
   };
 
   return (
-    <View className="flex-1 h-full p-6">
-      <TouchableOpacity 
-        onPress={() => onNavigate(ViewState.WELCOME)}
-        className="flex-row items-center gap-1 mb-6"
-      >
-        <ChevronLeft size={20} className="text-slate-400" /> 
-        <Text className="text-slate-400">Back</Text>
-      </TouchableOpacity>
+    <View className="flex-1 h-full bg-[#050505] relative overflow-hidden">
+      {/* Ambient Background Elements */}
+      <div className="absolute top-[-20%] left-[-20%] w-[80%] h-[60%] bg-indigo-600/20 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[50%] bg-purple-600/10 rounded-full blur-[100px] pointer-events-none" />
 
-      <View className="space-y-2 mb-6">
-        <Text className="text-3xl font-bold text-white">Welcome back</Text>
-        <Text className="text-slate-400">Access your wallet securely.</Text>
+      {/* Header */}
+      <View className="pt-14 px-6 z-10">
+        <TouchableOpacity 
+          onPress={() => onNavigate(ViewState.WELCOME)}
+          className="w-10 h-10 rounded-full bg-white/5 border border-white/10 items-center justify-center active:bg-white/10 transition-colors"
+        >
+          <ChevronLeft size={20} className="text-white" /> 
+        </TouchableOpacity>
       </View>
 
-      {/* Login Method Toggle */}
-      <Row className="p-1 bg-surface rounded-xl border border-white/5 mb-8">
-        <TouchableOpacity
-          onPress={() => setLoginMethod('email')}
-          className={`flex-1 py-2 items-center rounded-lg ${loginMethod === 'email' ? 'bg-white/10 shadow-sm' : ''}`}
-        >
-          <Text className={`text-sm font-medium ${loginMethod === 'email' ? 'text-white' : 'text-slate-400'}`}>Email</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => setLoginMethod('phrase')}
-          className={`flex-1 py-2 items-center rounded-lg ${loginMethod === 'phrase' ? 'bg-white/10 shadow-sm' : ''}`}
-        >
-          <Text className={`text-sm font-medium ${loginMethod === 'phrase' ? 'text-white' : 'text-slate-400'}`}>Import Phrase</Text>
-        </TouchableOpacity>
-      </Row>
+      <View className="flex-1 px-6 pt-8 z-10 flex flex-col">
+        {/* Title Block */}
+        <View className="mb-10">
+          <Text className="text-4xl font-bold text-white mb-2 tracking-tight">
+            Access <br />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">Nova Vault</span>
+          </Text>
+          <Text className="text-slate-400 text-base">Securely manage your digital assets.</Text>
+        </View>
 
-      <View className="flex-1">
-        {loginMethod === 'email' ? (
-          <View className="space-y-4">
-            <View className="space-y-2">
-              <Text className="text-sm font-medium text-slate-300">Email Address</Text>
-              <View className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
-                <TextInput
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full bg-surface border border-white/10 rounded-xl py-3.5 pl-11 pr-4 text-white"
-                  placeholder="name@example.com"
-                />
+        {/* Switcher */}
+        <View className="bg-white/5 p-1 rounded-2xl flex-row border border-white/10 mb-8 relative">
+           {/* Animated Slider Background - Simplified for React Native shim */}
+           <View className={`absolute top-1 bottom-1 rounded-xl bg-white/10 transition-all duration-300 ease-out w-[48%] ${loginMethod === 'email' ? 'left-1' : 'left-[51%]'}`} />
+           
+           <TouchableOpacity
+             onPress={() => setLoginMethod('email')}
+             className="flex-1 py-3 items-center justify-center z-10"
+           >
+             <Text className={`text-sm font-bold transition-colors ${loginMethod === 'email' ? 'text-white' : 'text-slate-500'}`}>Cloud Account</Text>
+           </TouchableOpacity>
+           <TouchableOpacity
+             onPress={() => setLoginMethod('phrase')}
+             className="flex-1 py-3 items-center justify-center z-10"
+           >
+             <Text className={`text-sm font-bold transition-colors ${loginMethod === 'phrase' ? 'text-white' : 'text-slate-500'}`}>Self-Custody</Text>
+           </TouchableOpacity>
+        </View>
+
+        {/* Form Container */}
+        <View className="flex-1">
+          {loginMethod === 'email' ? (
+            <View className="space-y-5 animate-in fade-in slide-in-from-left-4 duration-300">
+              <View className="space-y-2">
+                <Text className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">Email</Text>
+                <View className="relative group">
+                  <div className="absolute inset-0 bg-white/5 rounded-2xl border border-white/10 group-focus-within:border-indigo-500/50 group-focus-within:bg-white/10 transition-all" />
+                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-indigo-400 transition-colors" size={18} />
+                  <TextInput
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full h-14 pl-12 pr-4 text-white text-base relative z-10 bg-transparent outline-none"
+                    placeholder="name@example.com"
+                    placeholderTextColor="#64748b"
+                  />
+                </View>
+              </View>
+
+              <View className="space-y-2">
+                <Row className="justify-between items-center ml-1">
+                   <Text className="text-xs font-bold text-slate-400 uppercase tracking-wider">Password</Text>
+                   <TouchableOpacity>
+                     <Text className="text-xs font-bold text-indigo-400">Forgot?</Text>
+                   </TouchableOpacity>
+                </Row>
+                <View className="relative group">
+                  <div className="absolute inset-0 bg-white/5 rounded-2xl border border-white/10 group-focus-within:border-indigo-500/50 group-focus-within:bg-white/10 transition-all" />
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-indigo-400 transition-colors" size={18} />
+                  <TextInput
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full h-14 pl-12 pr-4 text-white text-base relative z-10 bg-transparent outline-none"
+                    placeholder="••••••••"
+                    placeholderTextColor="#64748b"
+                  />
+                </View>
               </View>
             </View>
+          ) : (
+            <View className="space-y-5 animate-in fade-in slide-in-from-right-4 duration-300">
+               <View className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-2xl flex-row gap-3 items-start">
+                  <ShieldCheck className="text-yellow-500 shrink-0 mt-0.5" size={18} />
+                  <Text className="text-xs text-yellow-200/80 leading-relaxed">
+                    Enter your 12 or 24-word Secret Recovery Phrase to restore your wallet locally.
+                  </Text>
+               </View>
 
-            <View className="space-y-2">
-              <Text className="text-sm font-medium text-slate-300">Password</Text>
-              <View className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
-                <TextInput
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full bg-surface border border-white/10 rounded-xl py-3.5 pl-11 pr-4 text-white"
-                  placeholder="••••••••"
-                />
+               <View className="space-y-2">
+                  <Text className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">Recovery Phrase</Text>
+                  <div className="relative group">
+                    <div className="absolute inset-0 bg-white/5 rounded-2xl border border-white/10 group-focus-within:border-yellow-500/50 transition-all" />
+                    <Key className="absolute left-4 top-4 text-slate-500 group-focus-within:text-yellow-500 transition-colors" size={18} />
+                    <textarea
+                      value={phrase}
+                      onChange={(e) => setPhrase(e.target.value)}
+                      className="w-full h-40 bg-transparent p-4 pl-12 text-white text-base focus:outline-none resize-none relative z-10"
+                      placeholder="apple banana cherry..."
+                      style={{ lineHeight: '1.6' }}
+                    />
+                  </div>
               </View>
             </View>
-          </View>
-        ) : (
-          <View className="space-y-4">
-             <View className="space-y-2">
-              <Text className="text-sm font-medium text-slate-300">Recovery Phrase</Text>
-              <View className="relative">
-                <Key className="absolute left-4 top-4 text-slate-500" size={18} />
-                <textarea
-                  value={phrase}
-                  onChange={(e) => setPhrase(e.target.value)}
-                  className="w-full h-32 bg-surface border border-white/10 rounded-xl py-3 pl-11 pr-4 text-white focus:outline-none resize-none"
-                  placeholder="Enter your 12-word recovery phrase..."
-                />
-              </View>
-              <Text className="text-xs text-slate-500">Usually 12 or 24 words separated by spaces.</Text>
-            </View>
-          </View>
-        )}
+          )}
 
-        {error ? (
-          <View className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg mt-4">
-            <Text className="text-red-400 text-sm text-center">{error}</Text>
-          </View>
-        ) : null}
+          {error ? (
+            <div className="mt-6 p-3 bg-red-500/10 border border-red-500/20 rounded-xl animate-in slide-in-from-bottom-2">
+              <Text className="text-red-400 text-sm text-center font-medium">{error}</Text>
+            </div>
+          ) : null}
+        </View>
 
-        <TouchableOpacity
-          onPress={handleSubmit}
-          disabled={isLoading}
-          className="w-full bg-primary py-3.5 rounded-xl shadow-lg mt-6 items-center justify-center flex-row gap-2"
-        >
-          {isLoading ? <Loader2 className="animate-spin text-white" size={20} /> : <Text className="text-white font-bold">{loginMethod === 'email' ? 'Sign In' : 'Recover Wallet'}</Text>}
-        </TouchableOpacity>
-
-        {loginMethod === 'email' && (
-          <View className="items-center mt-4">
-              <TouchableOpacity>
-                <Text className="text-sm text-primary">Forgot Password?</Text>
-              </TouchableOpacity>
-          </View>
-        )}
-      </View>
-      
-      <View className="mt-auto pt-12 items-center">
-          <Row className="gap-1">
-            <Text className="text-slate-400 text-sm">Don't have an account?</Text>
-            <TouchableOpacity onPress={() => onNavigate(ViewState.SIGNUP)}>
-                <Text className="text-white font-semibold text-sm">Sign Up</Text>
+        {/* Action Area */}
+        <View className="pb-safe-bottom mb-6">
+            <TouchableOpacity
+              onPress={handleSubmit}
+              disabled={isLoading}
+              className={`w-full h-14 rounded-2xl flex-row items-center justify-center gap-3 shadow-lg transition-all duration-300 ${
+                 loginMethod === 'email' ? 'bg-primary shadow-indigo-500/25' : 'bg-white text-black shadow-white/10'
+              }`}
+            >
+              {isLoading ? (
+                 <Loader2 className={`animate-spin ${loginMethod === 'email' ? 'text-white' : 'text-black'}`} size={24} />
+              ) : (
+                 <>
+                   <Text className={`font-bold text-lg ${loginMethod === 'email' ? 'text-white' : 'text-black'}`}>
+                     {loginMethod === 'email' ? 'Sign In' : 'Restore Wallet'}
+                   </Text>
+                   <ArrowRight size={20} className={loginMethod === 'email' ? 'text-white' : 'text-black'} />
+                 </>
+              )}
             </TouchableOpacity>
-          </Row>
+
+            {loginMethod === 'email' && (
+              <View className="mt-6 items-center">
+                 <Text className="text-slate-500 text-sm">
+                   Don't have an account?{' '}
+                   <span 
+                     onClick={() => onNavigate(ViewState.SIGNUP)}
+                     className="text-white font-bold cursor-pointer hover:underline"
+                   >
+                     Create one
+                   </span>
+                 </Text>
+              </View>
+            )}
+        </View>
       </View>
     </View>
   );

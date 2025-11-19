@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { ViewState, Asset, Transaction, User, ConnectedApp, NFT } from './types';
+import { ViewState, Asset, Transaction, User, NFT, BankingCard, CallSession, P2POffer } from './types';
 import { SafeAreaView, StatusBar, View } from './components/native';
 import { Navigation } from './components/Navigation';
 import { Home } from './views/Home';
@@ -16,57 +16,58 @@ import { Affiliate } from './views/Affiliate';
 import { News } from './views/News';
 import { Messages } from './views/Messages';
 import { Chat } from './views/Chat';
-import { DarkBrowser } from './views/DarkBrowser';
-import { ConnectedApps } from './views/ConnectedApps';
-import { ConnectRequest } from './views/ConnectRequest';
 import { Security } from './views/Security';
+import { Devices } from './views/Devices';
+import { Backup } from './views/Backup';
 import { Legal } from './views/Legal';
 import { Notifications } from './views/Notifications';
 import { Support } from './views/Support';
 import { AssetDetails } from './views/AssetDetails';
 import { NFTDetails } from './views/NFTDetails';
 import { Transfer } from './views/Transfer';
-import { Swap } from './views/Swap';
+import { CardDetails } from './views/CardDetails';
+import { P2P } from './views/P2P';
+import { P2POrder } from './views/P2POrder';
+import { BuyCrypto } from './views/BuyCrypto';
+import { PinLock } from './components/ui/PinLock';
+import { GlobalSearch } from './components/ui/GlobalSearch';
+import { CallInterface } from './components/ui/CallInterface';
 import { authService } from './services/authService';
 import { cryptoService } from './services/cryptoService';
+import { chainService } from './services/chainService';
 import { supabase } from './services/supabaseClient';
 
-// Initial state for user portfolio (would be fetched from DB in real app)
-const INITIAL_HOLDINGS: Record<string, number> = {
-    'BTC': 0.42,
-    'ETH': 4.5,
-    'SOL': 145.0,
-    'USDC': 5430.0,
-    'DOGE': 10000,
-    'LINK': 50
-};
-
-const INITIAL_TRANSACTIONS: Transaction[] = [
-  { id: 't1', type: 'receive', assetSymbol: 'BTC', amount: 0.0042, valueUsd: 269.76, date: 'Today, 10:23 AM', status: 'completed' },
-  { id: 't2', type: 'send', assetSymbol: 'ETH', amount: 1.2, valueUsd: 4140.24, date: 'Yesterday, 4:15 PM', status: 'completed' },
-  { id: 't3', type: 'swap', assetSymbol: 'SOL', amount: 45, valueUsd: 6700.50, date: 'Oct 24, 9:30 AM', status: 'completed' },
-  { id: 't4', type: 'buy', assetSymbol: 'USDC', amount: 500, valueUsd: 500.00, date: 'Oct 22, 2:10 PM', status: 'completed' },
-];
+// Advanced modules paused: Swap, Earn, Governance, DarkBrowser, CreatorStudio, ConnectedApps
 
 function App() {
   const [currentView, setCurrentView] = useState<ViewState>(ViewState.WELCOME);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [rawMarketData, setRawMarketData] = useState<Asset[]>([]);
-  const [userHoldings, setUserHoldings] = useState<Record<string, number>>(INITIAL_HOLDINGS);
-  const [transactions, setTransactions] = useState<Transaction[]>(INITIAL_TRANSACTIONS);
+  const [userHoldings, setUserHoldings] = useState<Record<string, number>>({});
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   
   const [totalBalance, setTotalBalance] = useState(0);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [activeChatIsGroup, setActiveChatIsGroup] = useState(false);
-  const [pendingAppRequest, setPendingAppRequest] = useState<Partial<ConnectedApp> | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [selectedNFT, setSelectedNFT] = useState<NFT | null>(null);
+  const [selectedCard, setSelectedCard] = useState<BankingCard | null>(null);
+  const [selectedP2POffer, setSelectedP2POffer] = useState<P2POffer | null>(null);
+  
+  // Security State
+  const [isLocked, setIsLocked] = useState(false);
   
   // AI Context State
   const [aiPrompt, setAiPrompt] = useState<string | undefined>(undefined);
+
+  // Global Search State
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+
+  // Global Call State
+  const [callSession, setCallSession] = useState<CallSession | null>(null);
 
   // Merge Market Data with User Holdings
   const updateAssets = (marketData: Asset[], holdings: Record<string, number>) => {
@@ -85,29 +86,55 @@ function App() {
       setAssets(mergedAssets);
   };
 
-  // Load Live Crypto Data
-  const loadMarketData = async () => {
+  // Load Live Crypto Data AND Real On-Chain Balances
+  const loadData = async () => {
       setIsRefreshing(true);
+      
+      // 1. Fetch Market Data (Prices)
       const liveAssets = await cryptoService.getMarketData();
       setRawMarketData(liveAssets);
-      updateAssets(liveAssets, userHoldings);
+
+      // 2. Fetch On-Chain Balances
+      try {
+         const realBalances = await chainService.fetchAllBalances();
+         // Merge local persisted holdings with chain data (for demo consistency)
+         const mergedBalances = { ...realBalances, ...userHoldings };
+         setUserHoldings(mergedBalances);
+         updateAssets(liveAssets, mergedBalances);
+      } catch (e) {
+         console.error("Failed to fetch chain balances", e);
+         // Fallback to what we have
+         updateAssets(liveAssets, userHoldings);
+      }
+      
+      // 3. Fetch Transactions
+      const txs = await chainService.getTransactions();
+      setTransactions(txs);
+
       setIsRefreshing(false);
   };
 
   useEffect(() => {
-    loadMarketData();
-    const interval = setInterval(loadMarketData, 60000);
+    // Initialize Chain Service (Load from LocalStorage if present)
+    chainService.init();
+    
+    loadData();
+    const interval = setInterval(loadData, 60000);
 
     // Auth Subscription
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
         if (session?.user) {
             const profile = await authService._ensureUserProfile(session.user.id, session.user.email || '');
             setCurrentUser(profile);
+            // Lock app if settings enabled
+            if (profile.settings.biometricsEnabled) setIsLocked(true);
+            
             if ([ViewState.WELCOME, ViewState.LOGIN, ViewState.SIGNUP].includes(currentView)) {
                 setCurrentView(ViewState.HOME);
             }
         } else {
             setCurrentUser(null);
+            setIsLocked(false);
             setCurrentView(ViewState.WELCOME);
         }
         setIsInitialized(true);
@@ -116,6 +143,7 @@ function App() {
     authService.getCurrentUser().then(user => {
         if (user) {
             setCurrentUser(user);
+            if (user.settings.biometricsEnabled) setIsLocked(true);
             setCurrentView(ViewState.HOME);
         }
         setIsInitialized(true);
@@ -133,9 +161,26 @@ function App() {
     setTotalBalance(total);
   }, [assets]);
 
+  // Simulate Incoming Call Trigger from Advisor
+  useEffect(() => {
+      if (currentView === ViewState.ADVISOR && aiPrompt && aiPrompt.toLowerCase().includes('call me')) {
+          // Trigger fake incoming call
+          setTimeout(() => {
+              setCallSession({
+                  id: 'call_' + Date.now(),
+                  partnerId: 'advisor_ai',
+                  partnerName: 'Nova Advisor',
+                  isVideo: true,
+                  status: 'incoming'
+              });
+          }, 3000);
+      }
+  }, [currentView, aiPrompt]);
+
   const handleLoginSuccess = (user: User) => {
     setCurrentUser(user);
     setCurrentView(ViewState.HOME);
+    if (user.settings.biometricsEnabled) setIsLocked(true);
   };
 
   const handleLogout = async () => {
@@ -150,20 +195,20 @@ function App() {
     setCurrentView(ViewState.CHAT);
   };
 
-  const handleSimulateAppRequest = (request: Partial<ConnectedApp>) => {
-    setPendingAppRequest(request);
-    setCurrentView(ViewState.CONNECT_REQUEST);
-  };
-
   const handleAssetSelect = (assetId: string) => {
       setSelectedAssetId(assetId);
       setCurrentView(ViewState.ASSET_DETAILS);
   };
   
-  // Unified navigation handler to catch params
   const handleNavigate = (view: ViewState, params?: any) => {
       if (view === ViewState.NFT_DETAILS && params?.nft) {
           setSelectedNFT(params.nft);
+      }
+      if (view === ViewState.CARD_DETAILS && params?.card) {
+          setSelectedCard(params.card);
+      }
+      if (view === ViewState.P2P_ORDER && params?.offer) {
+          setSelectedP2POffer(params.offer);
       }
       setCurrentView(view);
   };
@@ -173,7 +218,8 @@ function App() {
       setCurrentView(ViewState.ADVISOR);
   };
 
-  const handleTransaction = (type: 'send' | 'receive', amount: number, symbol: string) => {
+  const handleTransaction = (type: 'send' | 'receive' | 'buy', amount: number, symbol: string) => {
+      // 1. Optimistic Asset Update
       const newHoldings = { ...userHoldings };
       const currentBalance = newHoldings[symbol] || 0;
 
@@ -183,69 +229,76 @@ function App() {
              return;
           }
           newHoldings[symbol] = currentBalance - amount;
-      } else {
+      } else { // Receive or Buy
           newHoldings[symbol] = currentBalance + amount;
       }
 
       setUserHoldings(newHoldings);
       updateAssets(rawMarketData, newHoldings);
 
+      // 2. Create & Persist Transaction
       const assetPrice = rawMarketData.find(a => a.symbol === symbol)?.price || 0;
-
       const newTx: Transaction = {
           id: 'tx_' + Date.now(),
-          type: type,
+          type: type as any,
           assetSymbol: symbol,
           amount: amount,
           valueUsd: amount * assetPrice,
-          date: 'Just now',
+          date: new Date().toLocaleString(),
           status: 'completed'
       };
 
-      setTransactions(prev => [newTx, ...prev]);
-      setCurrentView(ViewState.WALLET);
+      chainService.saveTransaction(newTx); // Persist to local storage
+      setTransactions(prev => [newTx, ...prev]); // Update UI state
+
+      if (type !== 'receive' && type !== 'buy') setCurrentView(ViewState.WALLET);
   };
 
-  const handleSwap = (fromSymbol: string, fromAmount: number, toSymbol: string, toAmount: number) => {
-      const newHoldings = { ...userHoldings };
-      
-      // Deduct From
-      if ((newHoldings[fromSymbol] || 0) < fromAmount) {
-         alert('Insufficient Balance');
-         return;
-      }
-      newHoldings[fromSymbol] = (newHoldings[fromSymbol] || 0) - fromAmount;
-      
-      // Add To
-      newHoldings[toSymbol] = (newHoldings[toSymbol] || 0) + toAmount;
-      
-      setUserHoldings(newHoldings);
-      updateAssets(rawMarketData, newHoldings);
-      
-      const fromAssetPrice = rawMarketData.find(a => a.symbol === fromSymbol)?.price || 0;
+  // Dedicated handler for Marketplace Purchases (Simulated)
+  const handleMarketPurchase = (amount: number, symbol: string, sellerId: string) => {
+     handleTransaction('send', amount, symbol);
+  };
+  
+  const handleFaucet = () => {
+      // Inject 5 ETH
+      handleTransaction('receive', 5.0, 'ETH');
+      alert('Received 5.0 ETH from Testnet Faucet!');
+  };
 
-      const newTx: Transaction = {
-          id: 'tx_swap_' + Date.now(),
-          type: 'swap',
-          assetSymbol: fromSymbol, // Primary asset listed
-          amount: fromAmount,
-          valueUsd: fromAmount * fromAssetPrice,
-          date: 'Just now',
-          status: 'completed'
-      };
-      
-      setTransactions(prev => [newTx, ...prev]);
-      setCurrentView(ViewState.WALLET);
+  // Call Handlers
+  const startCall = (video: boolean) => {
+     if (activeChatId) {
+         // Find partner name
+         let partnerName = 'Contact';
+         if (activeChatIsGroup) {
+             const grp = authService.getGroupDetails(activeChatId);
+             partnerName = grp?.name || 'Group';
+         } else {
+             const friend = authService.getFriends(currentUser?.friends || []).find(f => f.id === activeChatId);
+             partnerName = friend?.name || 'Friend';
+         }
+
+         setCallSession({
+             id: 'call_' + Date.now(),
+             partnerId: activeChatId,
+             partnerName: partnerName,
+             isVideo: video,
+             status: 'active', // Start directly as active for outgoing
+             startTime: Date.now()
+         });
+     }
   };
 
   if (!isInitialized) return <div className="flex-1 bg-black flex items-center justify-center text-white">Loading...</div>;
 
   const renderContent = () => {
     switch (currentView) {
+      // --- Auth ---
       case ViewState.WELCOME: return <Welcome onNavigate={setCurrentView} />;
       case ViewState.LOGIN: return <Login onNavigate={setCurrentView} onLoginSuccess={handleLoginSuccess} />;
       case ViewState.SIGNUP: return <Signup onNavigate={setCurrentView} onSignupSuccess={handleLoginSuccess} />;
       
+      // --- Core Features ---
       case ViewState.HOME: 
          return <Home 
             assets={assets.filter(a => a.balance > 0)} 
@@ -253,9 +306,11 @@ function App() {
             user={currentUser} 
             onLogout={handleLogout} 
             isRefreshing={isRefreshing} 
-            onRefresh={loadMarketData}
+            onRefresh={loadData}
             onAssetClick={handleAssetSelect}
             onNavigate={handleNavigate}
+            onOpenSearch={() => setIsSearchOpen(true)}
+            onFaucet={handleFaucet}
          />;
       
       case ViewState.MARKET: return <Market assets={assets} />;
@@ -268,8 +323,9 @@ function App() {
               onNavigate={setCurrentView}
           />;
       
-      case ViewState.WALLET: return <Wallet transactions={transactions} assets={assets} />;
+      case ViewState.WALLET: return <Wallet transactions={transactions} assets={assets} onNavigate={handleNavigate} />;
       
+      // --- Details & Actions ---
       case ViewState.ASSET_DETAILS: 
          return selectedAssetId 
             ? <AssetDetails 
@@ -277,6 +333,7 @@ function App() {
                 onBack={() => setCurrentView(ViewState.HOME)}
                 onSend={() => setCurrentView(ViewState.SEND)}
                 onReceive={() => setCurrentView(ViewState.RECEIVE)}
+                onBuy={() => setCurrentView(ViewState.BUY)} 
                 onAskAI={handleAskAI}
                 transactions={transactions.filter(t => t.assetSymbol === (assets.find(a => a.id === selectedAssetId)?.symbol))}
               /> 
@@ -308,40 +365,135 @@ function App() {
              onSuccess={handleTransaction}
              preSelectedAssetId={selectedAssetId}
          />;
-
-      case ViewState.SWAP:
-         return <Swap 
-            assets={assets} 
-            onBack={() => setCurrentView(ViewState.HOME)}
-            onSwap={handleSwap}
+      
+      case ViewState.BUY:
+         return <BuyCrypto 
+             assets={assets}
+             preSelectedAssetId={selectedAssetId}
+             onBack={() => setCurrentView(ViewState.HOME)}
+             onSuccess={handleTransaction}
          />;
 
-      case ViewState.DARK_BROWSER: return <DarkBrowser />;
-      case ViewState.MESSAGES: return currentUser ? <Messages user={currentUser} onNavigate={setCurrentView} onSelectChat={handleChatSelect} /> : null;
-      case ViewState.CHAT: return currentUser && activeChatId ? <Chat currentUser={currentUser} targetId={activeChatId} isGroup={activeChatIsGroup} onBack={() => setCurrentView(ViewState.MESSAGES)} /> : null;
+      case ViewState.CARD_DETAILS:
+          return selectedCard ? (
+              <CardDetails 
+                  card={selectedCard} 
+                  assets={assets.filter(a => a.balance > 0)}
+                  onBack={() => setCurrentView(ViewState.WALLET)}
+                  onUpdateCard={(updated) => {
+                      setSelectedCard(updated);
+                  }}
+              />
+          ) : null;
+      
+      // --- Social & Marketplace ---
+      case ViewState.MESSAGES: 
+        return currentUser 
+          ? <Messages 
+              user={currentUser} 
+              onNavigate={setCurrentView} 
+              onSelectChat={handleChatSelect} 
+              assets={assets.filter(a => a.balance > 0)} 
+              onTransaction={handleTransaction} 
+              onMarketPurchase={handleMarketPurchase}
+            /> 
+          : null;
+          
+      case ViewState.CHAT: 
+        return currentUser && activeChatId 
+          ? <Chat 
+              currentUser={currentUser} 
+              targetId={activeChatId} 
+              isGroup={activeChatIsGroup} 
+              onBack={() => setCurrentView(ViewState.MESSAGES)}
+              assets={assets.filter(a => a.balance > 0)}
+              onSendTransaction={(amount, symbol) => handleTransaction('send', amount, symbol)}
+              onStartCall={startCall}
+            /> 
+          : null;
+      
+      case ViewState.P2P_MARKET:
+          return <P2P onNavigate={handleNavigate} />;
+      
+      case ViewState.P2P_ORDER:
+          return selectedP2POffer ? (
+              <P2POrder offer={selectedP2POffer} onNavigate={setCurrentView} />
+          ) : null;
+
+      // --- Profile & Settings ---
       case ViewState.PROFILE: return currentUser ? <Profile user={currentUser} onNavigate={setCurrentView} onLogout={handleLogout} onUpdateUser={setCurrentUser} /> : null;
       case ViewState.SETTINGS: return currentUser ? <Settings user={currentUser} onNavigate={setCurrentView} onUpdateUser={setCurrentUser} /> : null;
       case ViewState.AFFILIATE: return currentUser ? <Affiliate user={currentUser} onNavigate={setCurrentView} /> : null;
       case ViewState.NEWS: return <News onNavigate={setCurrentView} />;
-      case ViewState.CONNECTED_APPS: return currentUser ? <ConnectedApps user={currentUser} onNavigate={setCurrentView} onUpdateUser={setCurrentUser} onSimulateRequest={handleSimulateAppRequest} /> : null;
-      case ViewState.CONNECT_REQUEST: return currentUser && pendingAppRequest ? <ConnectRequest user={currentUser} requestData={pendingAppRequest} onNavigate={setCurrentView} onUpdateUser={setCurrentUser} /> : null;
       case ViewState.SECURITY: return currentUser ? <Security user={currentUser} onNavigate={setCurrentView} onUpdateUser={setCurrentUser} /> : null;
+      case ViewState.DEVICES: return <Devices onNavigate={setCurrentView} />;
+      case ViewState.BACKUP: return currentUser ? <Backup user={currentUser} onNavigate={setCurrentView} onUpdateUser={setCurrentUser} /> : null;
       case ViewState.LEGAL: return currentUser ? <Legal user={currentUser} onNavigate={setCurrentView} onUpdateUser={setCurrentUser} /> : null;
       case ViewState.NOTIFICATIONS: return <Notifications onNavigate={setCurrentView} />;
       case ViewState.SUPPORT: return <Support onNavigate={setCurrentView} />;
+      
+      // Default Fallback
       default: return <Home assets={assets} totalBalance={totalBalance} user={currentUser} onLogout={handleLogout} />;
     }
   };
 
   return (
-    <SafeAreaView className="bg-black">
+    <SafeAreaView className="bg-slate-950 flex items-center justify-center h-full w-full">
       <StatusBar barStyle="light-content" />
-      <View className="flex-1 relative max-w-md mx-auto w-full h-full bg-background overflow-hidden shadow-2xl shadow-black">
-        <View className="flex-1 h-full">
-          {renderContent()}
+      
+      {/* Overlays */}
+      <PinLock isLocked={isLocked} onUnlock={() => setIsLocked(false)} />
+      
+      <GlobalSearch 
+         isOpen={isSearchOpen} 
+         onClose={() => setIsSearchOpen(false)} 
+         onNavigate={handleNavigate} 
+      />
+      
+      {callSession && callSession.status !== 'ended' && (
+         <CallInterface 
+             session={callSession} 
+             onAccept={() => setCallSession({...callSession, status: 'active', startTime: Date.now()})}
+             onDecline={() => setCallSession(null)}
+             onEnd={() => setCallSession(null)}
+             onMinimize={() => setCallSession({...callSession, status: 'minimized'})}
+             onMaximize={() => setCallSession({...callSession, status: 'active'})}
+             onMuteToggle={() => {}}
+             onVideoToggle={(v) => setCallSession({...callSession, isVideo: v})}
+         />
+      )}
+
+      {/* 
+        RESPONSIVE APP CONTAINER 
+        - Mobile: Full width/height
+        - Tablet/Desktop: Centered card with shadow and border
+      */}
+      <View className="flex-1 relative w-full h-full md:h-[90vh] md:max-w-md lg:max-w-5xl md:rounded-[40px] md:border-[8px] md:border-slate-800 bg-background overflow-hidden shadow-2xl shadow-black mx-auto transition-all duration-300">
+        
+        {/* Tablet Notch Simulation (Visual flair for desktop) */}
+        <View className="hidden md:flex absolute top-0 left-1/2 -translate-x-1/2 w-32 h-6 bg-slate-800 rounded-b-xl z-[60] pointer-events-none" />
+
+        {/* Main Content Area with Global Transition */}
+        <View className="flex-1 h-full relative bg-black" key={currentView}>
+             <View className="flex-1 h-full animate-in fade-in slide-in-from-bottom-2 duration-300 fill-mode-forwards">
+                 {renderContent()}
+             </View>
         </View>
+
         {currentUser && 
-         ![ViewState.WELCOME, ViewState.LOGIN, ViewState.SIGNUP, ViewState.ASSET_DETAILS, ViewState.NFT_DETAILS, ViewState.SEND, ViewState.RECEIVE, ViewState.SWAP, ViewState.CHAT].includes(currentView) && (
+         ![
+            ViewState.WELCOME, 
+            ViewState.LOGIN, 
+            ViewState.SIGNUP, 
+            ViewState.ASSET_DETAILS, 
+            ViewState.NFT_DETAILS, 
+            ViewState.SEND, 
+            ViewState.RECEIVE, 
+            ViewState.BUY, 
+            ViewState.CHAT, 
+            ViewState.CARD_DETAILS, 
+            ViewState.P2P_ORDER
+          ].includes(currentView) && (
            <Navigation currentView={currentView} onNavigate={setCurrentView} />
         )}
       </View>

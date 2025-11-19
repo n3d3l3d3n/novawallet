@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en" class="dark">
   <head>
@@ -68,7 +69,18 @@
         -webkit-user-select: text;
       }
     </style>
-  <script type="importmap">
+    <!-- Polyfills for Web3 Libraries -->
+    <script>
+      window.global = window;
+      window.process = { env: { NODE_ENV: 'production' } };
+    </script>
+    <script src="https://bundle.run/buffer@6.0.3"></script>
+    <script>
+      if (typeof window.Buffer === 'undefined') {
+        window.Buffer = window.buffer.Buffer;
+      }
+    </script>
+    <script type="importmap">
 {
   "imports": {
     "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
@@ -77,7 +89,9 @@
     "react": "https://aistudiocdn.com/react@^19.2.0",
     "lucide-react": "https://aistudiocdn.com/lucide-react@^0.554.0",
     "recharts": "https://aistudiocdn.com/recharts@^3.4.1",
-    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.39.7"
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.39.7",
+    "ethers": "https://esm.sh/ethers@6.11.1",
+    "@solana/web3.js": "https://esm.sh/@solana/web3.js@1.91.1"
   }
 }
 </script>
@@ -86,3 +100,4 @@
     <div id="root"></div>
   </body>
 </html>
+    
