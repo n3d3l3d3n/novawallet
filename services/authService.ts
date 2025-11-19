@@ -1,13 +1,18 @@
 
-import { User, Message, Friend, ConnectedApp, Group, Attachment, AppPermissions, ComplianceSettings, BankingCard } from '../types';
+import { supabase } from './supabaseClient';
+import { User, Message, Friend, ConnectedApp, Group, Attachment, AppPermissions, ComplianceSettings, BankingCard, ActivityLog, NotificationItem, SupportTicket } from '../types';
 
-// Mock Database Keys
-const USERS_KEY = 'nova_users_db';
-const SESSION_KEY = 'nova_session_token';
+// We still use localStorage to "Mock" the SQL database table structure for Profile Data
+// since we can't create real SQL tables in this environment.
+// The Auth ID from Supabase will be the Key to find this data.
+const PROFILES_KEY = 'nova_profiles_db';
+const SESSION_KEY = 'nova_session_token'; // Legacy support
 const MESSAGES_KEY = 'nova_messages_db';
 const GROUPS_KEY = 'nova_groups_db';
+const LOGS_KEY = 'nova_activity_logs';
+const NOTIFICATIONS_KEY = 'nova_notifications';
+const TICKETS_KEY = 'nova_support_tickets';
 
-// Mock BIP-39 Wordlist (subset)
 const WORDLIST = [
   'abandon', 'ability', 'able', 'about', 'above', 'absent', 'absorb', 'abstract', 'absurd', 'abuse',
   'access', 'accident', 'account', 'accuse', 'achieve', 'acid', 'acoustic', 'acquire', 'across', 'act',
@@ -18,37 +23,44 @@ const WORDLIST = [
   'always', 'amateur', 'amazing', 'among', 'amount', 'amused', 'analyst', 'anchor', 'ancient', 'anger'
 ];
 
-// Simulate network delay
+// Simple Mock Encryption (Base64 for demo purposes)
+const mockEncrypt = (text: string): string => btoa(encodeURIComponent(text));
+const mockDecrypt = (cipher: string): string => {
+  try { return decodeURIComponent(atob(cipher)); } catch { return '*** Decryption Error ***'; }
+};
+
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-// Simple Mock Encryption (Base64 for demo purposes, representing E2EE)
-const mockEncrypt = (text: string): string => {
-  return btoa(encodeURIComponent(text));
-};
-
-const mockDecrypt = (cipher: string): string => {
-  try {
-    return decodeURIComponent(atob(cipher));
-  } catch {
-    return '*** Decryption Error ***';
-  }
-};
-
 export const authService = {
-  // Initialize DB if empty
+  
   init: () => {
-    if (!localStorage.getItem(USERS_KEY)) {
-      const demoUser: User = {
-        id: 'user_123',
-        name: 'Demo User',
-        username: '@demo',
-        email: 'demo@nova.com',
-        phoneNumber: '+15550199',
-        isEmailVerified: true,
-        isPhoneVerified: true,
-        // @ts-ignore - storing password in mock db object but not in interface
-        password: 'password', 
-        recoveryPhrase: 'abandon ability able about above absent absorb abstract absurd abuse access accident',
+    // Initialize Mock DB containers if missing
+    if (!localStorage.getItem(PROFILES_KEY)) localStorage.setItem(PROFILES_KEY, JSON.stringify([]));
+    if (!localStorage.getItem(MESSAGES_KEY)) localStorage.setItem(MESSAGES_KEY, JSON.stringify([]));
+    if (!localStorage.getItem(GROUPS_KEY)) localStorage.setItem(GROUPS_KEY, JSON.stringify([]));
+    if (!localStorage.getItem(LOGS_KEY)) localStorage.setItem(LOGS_KEY, JSON.stringify([]));
+    if (!localStorage.getItem(NOTIFICATIONS_KEY)) localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify([]));
+  },
+
+  // --- Supabase Auth Methods ---
+
+  // Helper to create a default profile for a new Supabase User
+  _ensureUserProfile: async (authId: string, email: string, meta: any = {}): Promise<User> => {
+    const profiles = JSON.parse(localStorage.getItem(PROFILES_KEY) || '[]');
+    let profile = profiles.find((p: User) => p.id === authId);
+
+    if (!profile) {
+      // Create new profile
+      profile = {
+        id: authId,
+        name: meta.name || email.split('@')[0],
+        username: meta.username || `@${email.split('@')[0]}`,
+        email: email,
+        phoneNumber: meta.phone || undefined,
+        isEmailVerified: true, // Assume true if Supabase login worked
+        isPhoneVerified: false,
+        kyc: { level: 0, status: 'unverified', documents: [] },
+        recoveryPhrase: authService.generateMnemonic(),
         joinedDate: new Date().toISOString(),
         friends: [],
         groups: [],
@@ -58,9 +70,10 @@ export const authService = {
           currency: 'USD',
           biometricsEnabled: false,
           hideBalances: false,
-          notifications: { priceAlerts: true, news: true, security: true }
+          autoLockTimer: 5,
+          notifications: { priceAlerts: true, news: true, security: true, marketing: false }
         },
-        permissions: {
+        permissions: meta.permissions || {
           camera: 'prompt',
           photos: 'prompt',
           microphone: 'prompt',
@@ -69,425 +82,210 @@ export const authService = {
           nfc: 'prompt',
           notifications: 'prompt'
         },
-        compliance: {
+        compliance: meta.compliance || {
             termsAccepted: true,
             privacyPolicyAccepted: true,
             dataProcessingConsent: true,
             marketingConsent: true,
             agreedToDate: Date.now()
         },
-        cards: [
-            { id: 'c1', last4: '4242', expiry: '12/28', holderName: 'DEMO USER', network: 'Visa', type: 'Debit', color: 'black', isFrozen: false }
-        ],
-        affiliateStats: { earnings: 1250.50, referrals: 12, rank: 'Silver' },
-        vendorStats: {
-            rating: 4.8,
-            reviewCount: 42,
-            totalSales: 150,
-            joinedDate: '2022-05-10',
-            badges: ['Top Rated', 'Verified']
+        cards: [],
+        affiliateStats: { earnings: 0, referrals: 0, rank: 'Bronze' },
+        vendorStats: { rating: 0, reviewCount: 0, totalSales: 0, joinedDate: new Date().toISOString(), badges: [] }
+      };
+      profiles.push(profile);
+      localStorage.setItem(PROFILES_KEY, JSON.stringify(profiles));
+    }
+    return profile;
+  },
+
+  login: async (email: string, password: string): Promise<User> => {
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    if (!data.user) throw new Error('No user returned');
+
+    // Log Activity
+    authService.addActivityLog({ 
+        id: 'log_'+Date.now(), action: 'Login', ipAddress: '192.168.1.1', device: 'Mobile', location: 'Supabase Auth', timestamp: Date.now(), status: 'success' 
+    });
+
+    return await authService._ensureUserProfile(data.user.id, data.user.email || '');
+  },
+
+  signup: async (name: string, email: string, password: string, username: string, permissions: AppPermissions, compliance: ComplianceSettings): Promise<{user: User, phrase: string}> => {
+    
+    // Check local username uniqueness mock
+    const profiles = JSON.parse(localStorage.getItem(PROFILES_KEY) || '[]');
+    if (profiles.find((p: any) => p.username.toLowerCase() === username.toLowerCase())) {
+        throw new Error('Username is already taken');
+    }
+
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          name,
+          username,
+          permissions,
+          compliance
         }
-      };
+      }
+    });
 
-      // Add some other mock vendors
-      const vendor2: User = {
-        ...demoUser,
-        id: 'user_vendor_2',
-        name: 'RolexKing',
-        username: '@rolexking',
-        vendorStats: { rating: 4.9, reviewCount: 305, totalSales: 1200, joinedDate: '2021-01-15', badges: ['Top Rated', 'Fast Shipper', 'Verified'] }
-      };
+    if (error) throw error;
+    if (!data.user) throw new Error('Signup failed');
 
-      const vendor3: User = {
-        ...demoUser,
-        id: 'user_vendor_3',
-        name: 'GamerZone',
-        username: '@gamerzone',
-        vendorStats: { rating: 4.5, reviewCount: 89, totalSales: 450, joinedDate: '2023-08-20', badges: ['Verified'] }
-      };
+    const userProfile = await authService._ensureUserProfile(data.user.id, email, { name, username, permissions, compliance });
+    
+    return { user: userProfile, phrase: userProfile.recoveryPhrase || '' };
+  },
 
-      localStorage.setItem(USERS_KEY, JSON.stringify([demoUser, vendor2, vendor3]));
+  logout: async () => {
+    await supabase.auth.signOut();
+    localStorage.removeItem(SESSION_KEY); // clear legacy
+  },
+
+  // Get current authenticated user with Profile Data
+  getCurrentUser: async (): Promise<User | null> => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) return null;
+    return await authService._ensureUserProfile(session.user.id, session.user.email || '');
+  },
+
+  // Legacy/Mock method for direct UI access (synchronous fallback)
+  // In a real app, this would be fully async or via Context/Hook
+  getCurrentUserSync: (): User | null => {
+     // We try to look up the session from local storage that Supabase sets, 
+     // but since we need the Full Profile, we might have to rely on a cached version 
+     // or the fact that we sync the profiles to localStorage.
+     // For this specific React setup, we'll grab the last known user ID from Supabase storage key
+     // or return null and let the async App.tsx effect handle it.
+     const key = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
+     if(key) {
+         const token = JSON.parse(localStorage.getItem(key) || '{}');
+         if(token.user?.id) {
+             const profiles = JSON.parse(localStorage.getItem(PROFILES_KEY) || '[]');
+             return profiles.find((p: User) => p.id === token.user.id) || null;
+         }
+     }
+     return null;
+  },
+
+  // Legacy login via Phrase (This keeps the "Import Wallet" feature alive using mock logic)
+  loginWithPhrase: async (phrase: string): Promise<User> => {
+    await delay(1000);
+    const profiles = JSON.parse(localStorage.getItem(PROFILES_KEY) || '[]');
+    const cleanPhrase = phrase.trim().replace(/\s+/g, ' ');
+    const user = profiles.find((u: any) => u.recoveryPhrase === cleanPhrase);
+
+    if (!user) throw new Error('Invalid recovery phrase. Wallet not found.');
+    
+    // Note: We can't easily "Log in to Supabase" with just a phrase unless we stored the phrase there.
+    // For this demo, we will return the user, but Supabase session won't be active.
+    // This is a hybrid state for the demo.
+    return user;
+  },
+
+  // --- Mock Data Utils (Synced with Profile Key) ---
+
+  updateProfile: async (userId: string, updates: Partial<User>): Promise<User> => {
+    await delay(300);
+    const profiles = JSON.parse(localStorage.getItem(PROFILES_KEY) || '[]');
+    const idx = profiles.findIndex((u: any) => u.id === userId);
+    if (idx === -1) throw new Error('User not found');
+
+    if (updates.username) {
+       const taken = profiles.some((u: any) => u.id !== userId && u.username.toLowerCase() === updates.username!.toLowerCase());
+       if (taken) throw new Error('Username taken');
     }
-    if (!localStorage.getItem(MESSAGES_KEY)) {
-      localStorage.setItem(MESSAGES_KEY, JSON.stringify([]));
-    }
-    if (!localStorage.getItem(GROUPS_KEY)) {
-      // Create some mock public groups
-      const publicGroups: Group[] = [
-        {
-          id: 'group_btc_whales',
-          name: 'BTC Whales 🐳',
-          type: 'public',
-          members: ['user_123'],
-          admins: [],
-          icon: '🐳',
-          description: 'Discussion for high volume Bitcoin traders.',
-          lastMessage: 'Bitcoin to the moon! 🚀',
-          lastMessageTime: Date.now() - 100000
-        },
-        {
-          id: 'group_nft_collectors',
-          name: 'NFT Collectors',
-          type: 'public',
-          members: [],
-          admins: [],
-          icon: '🎨',
-          description: 'Show off your latest JPEGs.',
-          lastMessage: 'Just minted a new one.',
-          lastMessageTime: Date.now() - 500000
-        }
-      ];
-      localStorage.setItem(GROUPS_KEY, JSON.stringify(publicGroups));
-    }
+
+    const updated = { ...profiles[idx], ...updates };
+    profiles[idx] = updated;
+    localStorage.setItem(PROFILES_KEY, JSON.stringify(profiles));
+    return updated;
   },
 
   generateMnemonic: (): string => {
     const phrase = [];
     for (let i = 0; i < 12; i++) {
-      const randomIndex = Math.floor(Math.random() * WORDLIST.length);
-      phrase.push(WORDLIST[randomIndex]);
+      phrase.push(WORDLIST[Math.floor(Math.random() * WORDLIST.length)]);
     }
     return phrase.join(' ');
   },
 
   checkUsernameAvailability: async (username: string): Promise<boolean> => {
-    await delay(500);
-    const users = JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
-    // Check if any user has this username (case insensitive)
-    const exists = users.some((u: any) => u.username?.toLowerCase() === username.toLowerCase());
-    return !exists;
+    await delay(300);
+    const profiles = JSON.parse(localStorage.getItem(PROFILES_KEY) || '[]');
+    return !profiles.some((u: any) => u.username?.toLowerCase() === username.toLowerCase());
   },
 
-  // --- Verification Logic ---
+  // --- Verification Placeholders ---
+  sendEmailVerification: async (email: string) => { console.log('Supabase handles this, or mock:', email); },
+  verifyEmailCode: async (uid: string, code: string) => { return true; },
+  sendSmsVerification: async (phone: string) => { console.log('Sending SMS', phone); },
+  verifySmsCode: async (uid: string, code: string) => { return true; },
 
-  sendEmailVerification: async (email: string): Promise<void> => {
-    await delay(1000);
-    console.log(`[Mock Email Service] Sending code 123456 to ${email}`);
-    // In a real app, this triggers backend to send email
+  // --- Social & App Logic (Mocked but keyed to UserID) ---
+  
+  getUserById: (id: string): User | null => {
+     const profiles = JSON.parse(localStorage.getItem(PROFILES_KEY) || '[]');
+     return profiles.find((u: any) => u.id === id) || null;
   },
-
-  verifyEmailCode: async (userId: string, code: string): Promise<boolean> => {
-    await delay(800);
-    if (code === '123456') {
-      await authService.updateProfile(userId, { isEmailVerified: true });
-      return true;
-    }
-    throw new Error('Invalid verification code');
-  },
-
-  sendSmsVerification: async (phoneNumber: string): Promise<void> => {
-    await delay(1000);
-    console.log(`[Mock SMS Service] Sending code 987654 to ${phoneNumber}`);
-  },
-
-  verifySmsCode: async (userId: string, code: string): Promise<boolean> => {
-    await delay(800);
-    if (code === '987654') {
-      await authService.updateProfile(userId, { isPhoneVerified: true });
-      return true;
-    }
-    throw new Error('Invalid SMS code');
-  },
-
-  // --- Auth Logic ---
-
-  login: async (email: string, password: string): Promise<User> => {
-    await delay(800); // Fake network loading
-    
-    const users = JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
-    const user = users.find((u: any) => u.email.toLowerCase() === email.toLowerCase() && u.password === password);
-
-    if (!user) {
-      throw new Error('Invalid email or password');
-    }
-
-    // Create session - remove sensitive data usually, but here we keep what we need
-    const sessionUser: User = { ...user };
-    // @ts-ignore
-    delete sessionUser.password;
-    
-    localStorage.setItem(SESSION_KEY, JSON.stringify(sessionUser));
-    
-    return sessionUser;
-  },
-
-  loginWithPhrase: async (phrase: string): Promise<User> => {
-    await delay(1000);
-
-    const users = JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
-    // Normalize spaces
-    const cleanPhrase = phrase.trim().replace(/\s+/g, ' ');
-    
-    const user = users.find((u: any) => u.recoveryPhrase === cleanPhrase);
-
-    if (!user) {
-      throw new Error('Invalid recovery phrase. Wallet not found.');
-    }
-
-    const sessionUser: User = { ...user };
-    // @ts-ignore
-    delete sessionUser.password;
-    localStorage.setItem(SESSION_KEY, JSON.stringify(sessionUser));
-
-    return sessionUser;
-  },
-
-  signup: async (
-      name: string, 
-      email: string, 
-      password: string, 
-      username: string,
-      permissions: AppPermissions,
-      compliance: ComplianceSettings
-    ): Promise<{user: User, phrase: string}> => {
-    await delay(1000);
-    
-    const users = JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
-    
-    if (users.find((u: any) => u.email.toLowerCase() === email.toLowerCase())) {
-      throw new Error('Email already exists');
-    }
-
-    // Double check username in case
-    if (users.find((u: any) => u.username?.toLowerCase() === username.toLowerCase())) {
-      throw new Error('Username taken');
-    }
-
-    const recoveryPhrase = authService.generateMnemonic();
-
-    const newUser: any = {
-      id: 'user_' + Date.now(),
-      name,
-      email,
-      username,
-      password,
-      phoneNumber: undefined,
-      isEmailVerified: false,
-      isPhoneVerified: false,
-      recoveryPhrase,
-      friends: [],
-      groups: [],
-      connectedApps: [],
-      cards: [],
-      joinedDate: new Date().toISOString(),
-      settings: {
-        currency: 'USD',
-        biometricsEnabled: false,
-        hideBalances: false,
-        notifications: { priceAlerts: true, news: true, security: true }
-      },
-      permissions: permissions,
-      compliance: compliance,
-      affiliateStats: { earnings: 0, referrals: 0, rank: 'Bronze' },
-      vendorStats: { rating: 0, reviewCount: 0, totalSales: 0, joinedDate: new Date().toISOString(), badges: [] }
-    };
-
-    users.push(newUser);
-    localStorage.setItem(USERS_KEY, JSON.stringify(users));
-
-    // Auto login
-    const sessionUser = { ...newUser };
-    delete sessionUser.password;
-    localStorage.setItem(SESSION_KEY, JSON.stringify(sessionUser));
-
-    return { user: sessionUser, phrase: recoveryPhrase };
-  },
-
-  updateProfile: async (userId: string, updates: Partial<User>): Promise<User> => {
-    await delay(600);
-    const users = JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
-    const userIndex = users.findIndex((u: any) => u.id === userId);
-    
-    if (userIndex === -1) throw new Error('User not found');
-
-    // If updating username, check uniqueness again excluding self
-    if (updates.username) {
-       const usernameTaken = users.some((u: any) => u.id !== userId && u.username.toLowerCase() === updates.username!.toLowerCase());
-       if (usernameTaken) throw new Error('Username is already taken');
-    }
-
-    const updatedUser = { ...users[userIndex], ...updates };
-    users[userIndex] = updatedUser;
-    
-    localStorage.setItem(USERS_KEY, JSON.stringify(users));
-    
-    // Update session if it's the current user
-    const currentSession = authService.getCurrentUser();
-    if (currentSession && currentSession.id === userId) {
-        const sessionUser = { ...updatedUser };
-        delete sessionUser.password;
-        localStorage.setItem(SESSION_KEY, JSON.stringify(sessionUser));
-    }
-
-    const result = { ...updatedUser };
-    delete result.password;
-    return result;
-  },
-
-  // --- Permissions Logic ---
-
-  updatePermission: async (userId: string, permission: keyof AppPermissions, status: 'granted' | 'denied' | 'limited'): Promise<User> => {
-     const currentUser = authService.getCurrentUser();
-     if (!currentUser) throw new Error('No user');
-     
-     const newPermissions = { ...currentUser.permissions, [permission]: status };
-     return authService.updateProfile(userId, { permissions: newPermissions });
-  },
-
-  logout: async () => {
-    await delay(200);
-    localStorage.removeItem(SESSION_KEY);
-  },
-
-  getCurrentUser: (): User | null => {
-    const session = localStorage.getItem(SESSION_KEY);
-    return session ? JSON.parse(session) : null;
-  },
-
-  getUserById: (userId: string): User | null => {
-     const users = JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
-     return users.find((u: any) => u.id === userId) || null;
-  },
-
-  // --- Social & Messaging Logic ---
 
   addFriend: async (userId: string, identifier: string): Promise<User> => {
-    // identifier can be @username or phone number
-    await delay(800);
-    const users = JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
-    const userIndex = users.findIndex((u: any) => u.id === userId);
+    await delay(500);
+    const profiles = JSON.parse(localStorage.getItem(PROFILES_KEY) || '[]');
+    const idx = profiles.findIndex((u: any) => u.id === userId);
+    const friend = profiles.find((u: any) => u.username.toLowerCase() === identifier.toLowerCase() || u.email === identifier);
     
-    // Find target friend
-    const friend = users.find((u: any) => 
-      u.username.toLowerCase() === identifier.toLowerCase() || 
-      u.phoneNumber === identifier
-    );
-
     if (!friend) throw new Error('User not found');
-    if (friend.id === userId) throw new Error('Cannot add yourself');
+    if (friend.id === userId) throw new Error('Cannot add self');
     
-    const currentUser = users[userIndex];
-    if (currentUser.friends.includes(friend.id)) throw new Error('User is already your friend');
-
-    // Update User
-    currentUser.friends.push(friend.id);
-    users[userIndex] = currentUser;
-    localStorage.setItem(USERS_KEY, JSON.stringify(users));
-
-    // Update Session
-    const sessionUser = { ...currentUser };
-    delete sessionUser.password;
-    localStorage.setItem(SESSION_KEY, JSON.stringify(sessionUser));
-
-    return sessionUser;
+    if (!profiles[idx].friends.includes(friend.id)) {
+        profiles[idx].friends.push(friend.id);
+        localStorage.setItem(PROFILES_KEY, JSON.stringify(profiles));
+    }
+    return profiles[idx];
   },
 
-  getFriends: (friendIds: string[]): Friend[] => {
-    const users = JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
-    return users
-      .filter((u: any) => friendIds.includes(u.id))
-      .map((u: any) => ({
-        id: u.id,
-        name: u.name,
-        username: u.username,
-        profileImage: u.profileImage,
-        // Mock status
-        status: Math.random() > 0.7 ? 'offline' : Math.random() > 0.5 ? 'away' : 'online',
-        lastSeen: '10m ago'
-      }));
+  getFriends: (ids: string[]): Friend[] => {
+    const profiles = JSON.parse(localStorage.getItem(PROFILES_KEY) || '[]');
+    return profiles.filter((u: any) => ids.includes(u.id)).map((u: any) => ({
+        id: u.id, name: u.name, username: u.username, profileImage: u.profileImage,
+        status: 'online', lastSeen: 'Now'
+    }));
   },
 
-  sendMessage: async (
-    senderId: string, 
-    receiverId: string, 
-    text: string, 
-    isEphemeral: boolean, 
-    isGroup: boolean = false,
-    attachments?: Attachment[]
-  ): Promise<Message> => {
-    // Mock E2EE by encrypting before storage
+  sendMessage: async (senderId: string, receiverId: string, text: string, isEphemeral: boolean, isGroup: boolean = false, attachments?: Attachment[]): Promise<Message> => {
     const encryptedText = mockEncrypt(text);
-    
     const newMessage: Message = {
-      id: 'msg_' + Date.now(),
-      senderId,
-      receiverId,
-      isGroup,
-      text: encryptedText,
-      attachments,
-      timestamp: Date.now(),
-      isEphemeral,
-      isRead: false
+      id: 'msg_' + Date.now(), senderId, receiverId, isGroup, text: encryptedText, attachments, timestamp: Date.now(), isEphemeral, isRead: false
     };
-
     const messages = JSON.parse(localStorage.getItem(MESSAGES_KEY) || '[]');
     messages.push(newMessage);
     localStorage.setItem(MESSAGES_KEY, JSON.stringify(messages));
-
-    // Update group last message if it's a group
-    if (isGroup) {
-      const groups = JSON.parse(localStorage.getItem(GROUPS_KEY) || '[]');
-      const groupIndex = groups.findIndex((g: Group) => g.id === receiverId);
-      if (groupIndex > -1) {
-        const lastMsgText = attachments && attachments.length > 0 
-          ? (attachments[0].type === 'image' ? '📷 Image' : '🎥 Video') 
-          : text;
-        
-        groups[groupIndex].lastMessage = lastMsgText; 
-        groups[groupIndex].lastMessageTime = Date.now();
-        localStorage.setItem(GROUPS_KEY, JSON.stringify(groups));
-      }
-    }
-
     return newMessage;
   },
 
   getMessages: (userId: string, targetId: string, isGroup: boolean = false): Message[] => {
-    const allMessages = JSON.parse(localStorage.getItem(MESSAGES_KEY) || '[]');
-    
+    const all = JSON.parse(localStorage.getItem(MESSAGES_KEY) || '[]');
     let conversation;
     if (isGroup) {
-      conversation = allMessages.filter((m: Message) => m.receiverId === targetId && m.isGroup);
+      conversation = all.filter((m: Message) => m.receiverId === targetId && m.isGroup);
     } else {
-      conversation = allMessages.filter((m: Message) => 
-        !m.isGroup &&
-        ((m.senderId === userId && m.receiverId === targetId) ||
-         (m.senderId === targetId && m.receiverId === userId))
-      );
+      conversation = all.filter((m: Message) => !m.isGroup && ((m.senderId === userId && m.receiverId === targetId) || (m.senderId === targetId && m.receiverId === userId)));
     }
-
-    // Decrypt for display
-    return conversation.map((m: Message) => ({
-       ...m,
-       text: mockDecrypt(m.text)
-    }));
+    return conversation.map((m: Message) => ({ ...m, text: mockDecrypt(m.text) }));
   },
 
-  // --- Group Logic ---
-
   createGroup: async (creatorId: string, name: string, type: 'private' | 'public', memberIds: string[], icon: string): Promise<Group> => {
-    await delay(1000);
     const groups = JSON.parse(localStorage.getItem(GROUPS_KEY) || '[]');
-    
     const newGroup: Group = {
-      id: 'group_' + Date.now(),
-      name,
-      type,
-      members: [...memberIds, creatorId], // Add creator to members
-      admins: [creatorId],
-      icon,
-      lastMessage: 'Group created',
-      lastMessageTime: Date.now()
+      id: 'group_' + Date.now(), name, type, members: [...memberIds, creatorId], admins: [creatorId], icon, lastMessage: 'Created', lastMessageTime: Date.now()
     };
-
     groups.push(newGroup);
     localStorage.setItem(GROUPS_KEY, JSON.stringify(groups));
-
-    // Update creator's group list
-    const user = await authService.updateProfile(creatorId, { 
-      // This is a bit hacky for the mock, normally backend handles this relation
-    }); 
-    
     return newGroup;
   },
 
@@ -502,98 +300,95 @@ export const authService = {
   },
 
   joinGroup: async (userId: string, groupId: string): Promise<void> => {
-    await delay(800);
     const groups = JSON.parse(localStorage.getItem(GROUPS_KEY) || '[]');
-    const groupIndex = groups.findIndex((g: Group) => g.id === groupId);
-    
-    if (groupIndex === -1) throw new Error('Group not found');
-    
-    if (!groups[groupIndex].members.includes(userId)) {
-      groups[groupIndex].members.push(userId);
-      localStorage.setItem(GROUPS_KEY, JSON.stringify(groups));
+    const idx = groups.findIndex((g: Group) => g.id === groupId);
+    if (idx > -1 && !groups[idx].members.includes(userId)) {
+        groups[idx].members.push(userId);
+        localStorage.setItem(GROUPS_KEY, JSON.stringify(groups));
     }
   },
-
-  getGroupDetails: (groupId: string): Group | null => {
-    const groups = JSON.parse(localStorage.getItem(GROUPS_KEY) || '[]');
-    return groups.find((g: Group) => g.id === groupId) || null;
+  
+  getGroupDetails: (id: string): Group | null => {
+     const groups = JSON.parse(localStorage.getItem(GROUPS_KEY) || '[]');
+     return groups.find((g: Group) => g.id === id) || null;
   },
 
-  // --- Connected Apps Logic ---
-
+  // Apps
   authorizeApp: async (userId: string, app: ConnectedApp): Promise<User> => {
-    await delay(1000);
-    const users = JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
-    const userIndex = users.findIndex((u: any) => u.id === userId);
-
-    if (userIndex === -1) throw new Error('User not found');
-    const currentUser = users[userIndex];
-
-    // Check if already connected, if so update
-    const existingAppIndex = (currentUser.connectedApps || []).findIndex((a: ConnectedApp) => a.id === app.id);
-    
-    if (!currentUser.connectedApps) currentUser.connectedApps = [];
-
-    if (existingAppIndex > -1) {
-      currentUser.connectedApps[existingAppIndex] = app;
-    } else {
-      currentUser.connectedApps.push(app);
-    }
-
-    users[userIndex] = currentUser;
-    localStorage.setItem(USERS_KEY, JSON.stringify(users));
-
-    // Update Session
-    const sessionUser = { ...currentUser };
-    delete sessionUser.password;
-    localStorage.setItem(SESSION_KEY, JSON.stringify(sessionUser));
-
-    return sessionUser;
+     const profiles = JSON.parse(localStorage.getItem(PROFILES_KEY) || '[]');
+     const idx = profiles.findIndex((u: any) => u.id === userId);
+     if (idx > -1) {
+         if (!profiles[idx].connectedApps) profiles[idx].connectedApps = [];
+         profiles[idx].connectedApps.push(app);
+         localStorage.setItem(PROFILES_KEY, JSON.stringify(profiles));
+         return profiles[idx];
+     }
+     throw new Error('User not found');
   },
 
   revokeApp: async (userId: string, appId: string): Promise<User> => {
-    await delay(500);
-    const users = JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
-    const userIndex = users.findIndex((u: any) => u.id === userId);
-
-    if (userIndex === -1) throw new Error('User not found');
-    const currentUser = users[userIndex];
-
-    if (currentUser.connectedApps) {
-      currentUser.connectedApps = currentUser.connectedApps.filter((a: ConnectedApp) => a.id !== appId);
-    }
-
-    users[userIndex] = currentUser;
-    localStorage.setItem(USERS_KEY, JSON.stringify(users));
-
-    // Update Session
-    const sessionUser = { ...currentUser };
-    delete sessionUser.password;
-    localStorage.setItem(SESSION_KEY, JSON.stringify(sessionUser));
-
-    return sessionUser;
+     const profiles = JSON.parse(localStorage.getItem(PROFILES_KEY) || '[]');
+     const idx = profiles.findIndex((u: any) => u.id === userId);
+     if (idx > -1) {
+         profiles[idx].connectedApps = profiles[idx].connectedApps.filter((a: ConnectedApp) => a.id !== appId);
+         localStorage.setItem(PROFILES_KEY, JSON.stringify(profiles));
+         return profiles[idx];
+     }
+     throw new Error('User not found');
   },
 
-  // --- Card Logic (Mock) ---
-  addCard: async (userId: string, card: BankingCard): Promise<User> => {
-      await delay(1500);
-      const users = JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
-      const userIndex = users.findIndex((u: any) => u.id === userId);
-      if (userIndex === -1) throw new Error('User not found');
-      
-      const currentUser = users[userIndex];
-      if (!currentUser.cards) currentUser.cards = [];
-      currentUser.cards.push(card);
-      
-      users[userIndex] = currentUser;
-      localStorage.setItem(USERS_KEY, JSON.stringify(users));
+  updatePermission: async (userId: string, permission: keyof AppPermissions, status: string): Promise<User> => {
+     const profiles = JSON.parse(localStorage.getItem(PROFILES_KEY) || '[]');
+     const idx = profiles.findIndex((u: any) => u.id === userId);
+     if (idx > -1) {
+         profiles[idx].permissions[permission] = status;
+         localStorage.setItem(PROFILES_KEY, JSON.stringify(profiles));
+         return profiles[idx];
+     }
+     throw new Error('User not found');
+  },
 
-      const sessionUser = { ...currentUser };
-      delete sessionUser.password;
-      localStorage.setItem(SESSION_KEY, JSON.stringify(sessionUser));
-      return sessionUser;
-  }
+  getActivityLogs: (): ActivityLog[] => JSON.parse(localStorage.getItem(LOGS_KEY) || '[]'),
+  addActivityLog: (log: ActivityLog) => {
+      const logs = JSON.parse(localStorage.getItem(LOGS_KEY) || '[]');
+      logs.unshift(log);
+      localStorage.setItem(LOGS_KEY, JSON.stringify(logs));
+  },
+  getNotifications: (): NotificationItem[] => JSON.parse(localStorage.getItem(NOTIFICATIONS_KEY) || '[]'),
+  markNotificationRead: (id: string) => {
+      const ns = JSON.parse(localStorage.getItem(NOTIFICATIONS_KEY) || '[]');
+      const idx = ns.findIndex((n: any) => n.id === id);
+      if(idx>-1) { ns[idx].isRead = true; localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(ns)); }
+  },
+  
+  submitKYCDocument: async (userId: string, type: string): Promise<User> => {
+     await delay(1000);
+     const profiles = JSON.parse(localStorage.getItem(PROFILES_KEY) || '[]');
+     const idx = profiles.findIndex((u: any) => u.id === userId);
+     if(idx>-1){
+         profiles[idx].kyc.level = 2;
+         profiles[idx].kyc.status = 'verified';
+         localStorage.setItem(PROFILES_KEY, JSON.stringify(profiles));
+         return profiles[idx];
+     }
+     throw new Error('User not found');
+  },
+
+  exportUserData: async () => { await delay(1000); },
+  deleteAccount: async (userId: string) => {
+     await delay(1000);
+     let profiles = JSON.parse(localStorage.getItem(PROFILES_KEY) || '[]');
+     profiles = profiles.filter((u: any) => u.id !== userId);
+     localStorage.setItem(PROFILES_KEY, JSON.stringify(profiles));
+     await authService.logout();
+  },
+
+  createSupportTicket: async (subject: string) => {
+     const tickets = JSON.parse(localStorage.getItem(TICKETS_KEY) || '[]');
+     tickets.push({ id: 't_'+Date.now(), subject, status: 'open', lastUpdate: Date.now() });
+     localStorage.setItem(TICKETS_KEY, JSON.stringify(tickets));
+  },
+  getSupportTickets: (): SupportTicket[] => JSON.parse(localStorage.getItem(TICKETS_KEY) || '[]')
 };
 
-// Initialize on load
 authService.init();

@@ -1,7 +1,9 @@
+
 import React, { useState } from 'react';
 import { ViewState, User, ConnectedApp } from '../types';
 import { authService } from '../services/authService';
 import { ShieldCheck, Check, X, ChevronLeft, AlertCircle, Globe, Info } from 'lucide-react';
+import { View, Text, TouchableOpacity, Row } from '../components/native';
 
 interface ConnectRequestProps {
   user: User;
@@ -35,88 +37,89 @@ export const ConnectRequest: React.FC<ConnectRequestProps> = ({ user, requestDat
   };
 
   return (
-    <div className="h-full p-6 flex flex-col animate-in slide-in-from-bottom duration-500">
-      <button 
-        onClick={() => onNavigate(ViewState.CONNECTED_APPS)}
-        className="flex items-center gap-1 text-slate-400 hover:text-white transition-colors mb-4"
+    <View className="flex-1 h-full p-6">
+      <TouchableOpacity 
+        onPress={() => onNavigate(ViewState.CONNECTED_APPS)}
+        className="flex-row items-center gap-1 mb-4"
       >
-        <ChevronLeft size={20} /> Cancel
-      </button>
+        <ChevronLeft size={20} className="text-slate-400" /> 
+        <Text className="text-slate-400">Cancel</Text>
+      </TouchableOpacity>
 
-      <div className="flex-1 flex flex-col items-center justify-center space-y-6 text-center">
+      <View className="flex-1 items-center justify-center">
         
         {/* Logos */}
-        <div className="flex items-center gap-4 mb-4">
-           <div className="w-16 h-16 rounded-2xl bg-surface border border-white/10 flex items-center justify-center text-3xl shadow-lg">
-              {requestData.icon}
-           </div>
-           <div className="w-8 h-px bg-slate-600 border-t border-dashed border-slate-400" />
-           <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/30">
-              <span className="font-bold text-xl text-white">N</span>
-           </div>
-        </div>
+        <Row className="items-center gap-4 mb-4">
+           <View className="w-16 h-16 rounded-2xl bg-surface border border-white/10 items-center justify-center shadow-lg">
+              <Text className="text-3xl">{requestData.icon}</Text>
+           </View>
+           <View className="w-8 h-px bg-slate-600 border-t border-dashed border-slate-400" />
+           <View className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-indigo-500 to-purple-600 items-center justify-center shadow-lg shadow-indigo-500/30">
+              <Text className="font-bold text-xl text-white">N</Text>
+           </View>
+        </Row>
 
-        <div className="space-y-2">
-          <h2 className="text-2xl font-bold">Connect to {requestData.name}?</h2>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface border border-white/5 text-xs text-slate-400">
-             <Globe size={12} />
-             {requestData.domain}
-          </div>
-        </div>
+        <View className="space-y-2 mb-6 items-center">
+          <Text className="text-2xl font-bold text-center">Connect to {requestData.name}?</Text>
+          <Row className="items-center gap-1.5 px-3 py-1 rounded-full bg-surface border border-white/5">
+             <Globe size={12} className="text-slate-400" />
+             <Text className="text-xs text-slate-400">{requestData.domain}</Text>
+          </Row>
+        </View>
 
-        <div className="w-full bg-surface/50 border border-white/10 rounded-2xl p-4 text-left space-y-3">
-           <div className="flex items-start gap-3">
+        <View className="w-full bg-surface/50 border border-white/10 rounded-2xl p-4 space-y-3 mb-4">
+           <Row className="items-start gap-3">
               <Info className="text-slate-400 mt-0.5" size={18} />
-              <p className="text-sm text-slate-300">This application is requesting permission to:</p>
-           </div>
-           <ul className="space-y-3 pl-2">
-              <li className="flex items-center gap-3 text-sm font-medium">
-                 <div className="p-1 bg-emerald-500/20 rounded-full">
+              <Text className="text-sm text-slate-300">This application is requesting permission to:</Text>
+           </Row>
+           <View className="pl-2 space-y-3">
+              <Row className="items-center gap-3">
+                 <View className="p-1 bg-emerald-500/20 rounded-full">
                    <Check size={12} className="text-emerald-400" />
-                 </div>
-                 View your username and avatar
-              </li>
-              <li className="flex items-center gap-3 text-sm font-medium">
-                 <div className="p-1 bg-emerald-500/20 rounded-full">
+                 </View>
+                 <Text className="text-sm font-medium">View your username and avatar</Text>
+              </Row>
+              <Row className="items-center gap-3">
+                 <View className="p-1 bg-emerald-500/20 rounded-full">
                    <Check size={12} className="text-emerald-400" />
-                 </div>
-                 View your public wallet address
-              </li>
+                 </View>
+                 <Text className="text-sm font-medium">View your public wallet address</Text>
+              </Row>
               {requestData.permissions?.includes('view_balance') && (
-                <li className="flex items-center gap-3 text-sm font-medium">
-                   <div className="p-1 bg-yellow-500/20 rounded-full">
+                <Row className="items-center gap-3">
+                   <View className="p-1 bg-yellow-500/20 rounded-full">
                      <AlertCircle size={12} className="text-yellow-400" />
-                   </div>
-                   View your asset balances
-                </li>
+                   </View>
+                   <Text className="text-sm font-medium">View your asset balances</Text>
+                </Row>
               )}
-           </ul>
-        </div>
+           </View>
+        </View>
 
-        <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-xl flex items-start gap-3 text-left">
+        <View className="w-full p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-xl flex-row items-start gap-3">
            <ShieldCheck className="text-indigo-400 flex-shrink-0" size={20} />
-           <p className="text-xs text-indigo-200/80">
+           <Text className="text-xs text-indigo-200/80 flex-1 leading-relaxed">
              Nova Wallet does not share your private keys or recovery phrase with any connected application.
-           </p>
-        </div>
+           </Text>
+        </View>
 
-      </div>
+      </View>
 
-      <div className="mt-auto pt-4 space-y-3">
-        <button
-          onClick={handleAllow}
+      <View className="mt-auto pt-4 space-y-3">
+        <TouchableOpacity
+          onPress={handleAllow}
           disabled={isLoading}
-          className="w-full bg-primary hover:bg-indigo-500 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-indigo-500/25 transition-all flex items-center justify-center gap-2"
+          className="w-full bg-primary py-3.5 rounded-xl shadow-lg items-center justify-center"
         >
-           {isLoading ? 'Connecting...' : 'Authorize'}
-        </button>
-        <button
-          onClick={() => onNavigate(ViewState.CONNECTED_APPS)}
-          className="w-full bg-surface border border-white/10 hover:bg-slate-800 text-white font-semibold py-3.5 rounded-xl transition-all"
+           <Text className="text-white font-bold">{isLoading ? 'Connecting...' : 'Authorize'}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => onNavigate(ViewState.CONNECTED_APPS)}
+          className="w-full bg-surface border border-white/10 py-3.5 rounded-xl items-center justify-center"
         >
-          Cancel
-        </button>
-      </div>
-    </div>
+          <Text className="text-white font-semibold">Cancel</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
   );
 };

@@ -14,23 +14,39 @@ export enum ViewState {
   CHAT = 'CHAT',
   DARK_BROWSER = 'DARK_BROWSER',
   
+  // Transaction Views
+  ASSET_DETAILS = 'ASSET_DETAILS',
+  NFT_DETAILS = 'NFT_DETAILS', // New
+  SEND = 'SEND',
+  RECEIVE = 'RECEIVE',
+  SWAP = 'SWAP',
+  
   // Profile Ecosystem
   PROFILE = 'PROFILE',
   SETTINGS = 'SETTINGS',
   AFFILIATE = 'AFFILIATE',
   NEWS = 'NEWS',
   CONNECTED_APPS = 'CONNECTED_APPS',
-  CONNECT_REQUEST = 'CONNECT_REQUEST'
+  CONNECT_REQUEST = 'CONNECT_REQUEST',
+  
+  // New Sections
+  SECURITY = 'SECURITY',
+  LEGAL = 'LEGAL', // KYC & Compliance
+  NOTIFICATIONS = 'NOTIFICATIONS',
+  SUPPORT = 'SUPPORT'
 }
 
 export interface UserSettings {
   currency: 'USD' | 'EUR' | 'GBP' | 'JPY';
   biometricsEnabled: boolean;
   hideBalances: boolean;
+  autoLockTimer: number; // minutes
+  antiPhishingCode?: string;
   notifications: {
     priceAlerts: boolean;
     news: boolean;
     security: boolean;
+    marketing: boolean;
   };
 }
 
@@ -123,6 +139,44 @@ export interface BankingCard {
   isFrozen: boolean;
 }
 
+// New Interfaces for Security & Legal
+export interface ActivityLog {
+  id: string;
+  action: string; // "Login", "Withdrawal", "Password Change"
+  ipAddress: string;
+  device: string;
+  location: string;
+  timestamp: number;
+  status: 'success' | 'failed';
+}
+
+export interface NotificationItem {
+  id: string;
+  title: string;
+  message: string;
+  type: 'security' | 'transaction' | 'system' | 'price';
+  timestamp: number;
+  isRead: boolean;
+  actionUrl?: string;
+}
+
+export interface SupportTicket {
+  id: string;
+  subject: string;
+  status: 'open' | 'closed' | 'pending';
+  lastUpdate: number;
+}
+
+export interface KYCState {
+  level: 0 | 1 | 2 | 3; // 0: Unverified, 1: Basic, 2: ID Verified, 3: Fully Verified
+  status: 'unverified' | 'pending' | 'verified' | 'rejected';
+  documents: {
+    type: 'passport' | 'license' | 'id_card';
+    status: 'pending' | 'approved' | 'rejected';
+    submittedAt: number;
+  }[];
+}
+
 export interface User {
   id: string;
   name: string;
@@ -131,6 +185,7 @@ export interface User {
   phoneNumber?: string;
   isEmailVerified: boolean;
   isPhoneVerified: boolean;
+  kyc: KYCState; // New
   profileImage?: string; // Base64 or URL
   recoveryPhrase?: string;
   joinedDate: string;
@@ -158,6 +213,26 @@ export interface Asset {
   change24h: number;
   color: string;
   chartData: { value: number }[];
+}
+
+// NFT Interfaces
+export interface NFTTrait {
+  type: string;
+  value: string;
+  rarity?: number; // percentage
+}
+
+export interface NFT {
+  id: string;
+  collectionName: string;
+  tokenId: string;
+  name: string;
+  imageUrl: string;
+  floorPrice: number; // in ETH/SOL
+  currency: string;
+  traits: NFTTrait[];
+  description: string;
+  chain: 'ETH' | 'SOL' | 'POLY';
 }
 
 export interface Transaction {
@@ -229,3 +304,5 @@ export interface Product {
   reviews: ProductReview[];
   createdAt: number;
 }
+
+export type CallState = 'idle' | 'calling' | 'connected' | 'ended';

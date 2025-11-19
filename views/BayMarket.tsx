@@ -3,8 +3,9 @@ import React, { useState, useEffect } from 'react';
 import { Product, User, GeoLocation, ShippingOption } from '../types';
 import { marketService, CATEGORIES } from '../services/marketService';
 import { authService } from '../services/authService';
-import { Search, ShoppingCart, Star, ArrowLeft, CheckCircle, Truck, ShieldCheck, User as UserIcon, Loader2, MapPin, Plus, Trash2, Package, DollarSign, Image as ImageIcon } from 'lucide-react';
+import { Search, Star, ArrowLeft, CheckCircle, Truck, ShieldCheck, Loader2, MapPin, Plus, Trash2, DollarSign, Image as ImageIcon } from 'lucide-react';
 import { Card } from '../components/ui/Card';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, Row, Image } from '../components/native';
 
 interface BayMarketProps {
   user: User;
@@ -116,11 +117,9 @@ export const BayMarket: React.FC<BayMarketProps> = ({ user }) => {
     const [loadingAddr, setLoadingAddr] = useState(false);
 
     const handleMapClick = async (e: React.MouseEvent<HTMLDivElement>) => {
-        // Mock coordinate generation based on click
         const rect = e.currentTarget.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
-        // Pseudo random coords for demo visual
         const lat = 30 + (y / rect.height) * 20;
         const lng = -120 + (x / rect.width) * 50;
         
@@ -132,8 +131,8 @@ export const BayMarket: React.FC<BayMarketProps> = ({ user }) => {
     };
 
     return (
-        <div className="space-y-2">
-            <label className="text-sm font-bold text-slate-400">Item Location</label>
+        <View className="space-y-2">
+            <Text className="text-sm font-bold text-slate-400">Item Location</Text>
             <div 
                 onClick={handleMapClick}
                 className="w-full h-40 bg-slate-800 rounded-xl border border-white/10 relative overflow-hidden cursor-crosshair group"
@@ -153,238 +152,236 @@ export const BayMarket: React.FC<BayMarketProps> = ({ user }) => {
                 )}
             </div>
             {location.address && (
-                <div className="flex items-center gap-2 text-sm text-emerald-400 bg-emerald-500/10 p-2 rounded-lg border border-emerald-500/20">
-                   {loadingAddr ? <Loader2 size={14} className="animate-spin" /> : <MapPin size={14} />}
-                   {loadingAddr ? 'Locating...' : location.address}
-                </div>
+                <Row className="items-center gap-2 bg-emerald-500/10 p-2 rounded-lg border border-emerald-500/20">
+                   {loadingAddr ? <Loader2 size={14} className="animate-spin text-emerald-400" /> : <MapPin size={14} className="text-emerald-400" />}
+                   <Text className="text-sm text-emerald-400">{loadingAddr ? 'Locating...' : location.address}</Text>
+                </Row>
             )}
-            <label className="flex items-center gap-2 mt-2 cursor-pointer">
-                <input 
-                    type="checkbox" 
-                    checked={location.isLocalPickupAvailable}
-                    onChange={(e) => onChange({...location, isLocalPickupAvailable: e.target.checked})}
-                    className="rounded border-white/20 bg-white/5"
-                />
-                <span className="text-sm text-slate-300">Enable Local Pickup</span>
-            </label>
-        </div>
+            <Row className="items-center gap-2 mt-2">
+                 {/* Checkbox Shim */}
+                <TouchableOpacity 
+                    onPress={() => onChange({...location, isLocalPickupAvailable: !location.isLocalPickupAvailable})}
+                    className={`w-5 h-5 rounded border flex items-center justify-center ${location.isLocalPickupAvailable ? 'bg-primary border-primary' : 'bg-white/5 border-white/20'}`}
+                >
+                    {location.isLocalPickupAvailable && <CheckCircle size={14} className="text-white" />}
+                </TouchableOpacity>
+                <Text className="text-sm text-slate-300">Enable Local Pickup</Text>
+            </Row>
+        </View>
     );
   };
 
   // --- Render Header ---
   const renderHeader = () => (
-    <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-md border-b border-white/5 pb-3 pt-2">
-      <div className="flex items-center gap-2 mb-3">
+    <View className="bg-background/95 backdrop-blur-md border-b border-white/5 pb-3 pt-2 sticky top-0 z-20">
+      <Row className="items-center gap-2 mb-3 px-4">
         {(view !== 'home') && (
-          <button onClick={() => setView('home')} className="p-2 rounded-full hover:bg-white/10">
-            <ArrowLeft size={20} />
-          </button>
+          <TouchableOpacity onPress={() => setView('home')} className="p-2 rounded-full hover:bg-white/10">
+            <ArrowLeft size={20} className="text-white" />
+          </TouchableOpacity>
         )}
-        <div className="relative flex-1">
+        <View className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-          <input 
-            type="text" 
+          <TextInput 
             value={searchQuery}
             onChange={(e) => {
               setSearchQuery(e.target.value);
               setView('search');
             }}
             placeholder="Search BayMarket..."
-            className="w-full bg-surface border border-white/10 rounded-xl py-2 pl-10 pr-4 text-sm text-white focus:outline-none focus:ring-2 focus:ring-primary/50"
+            className="w-full bg-surface border border-white/10 rounded-xl py-2 pl-10 pr-4 text-sm text-white"
           />
-        </div>
-        <button 
-            onClick={() => setView('sell')} 
-            className="px-3 py-2 bg-primary hover:bg-indigo-500 rounded-xl text-white text-xs font-bold flex items-center gap-1 transition-colors"
+        </View>
+        <TouchableOpacity 
+            onPress={() => setView('sell')} 
+            className="px-3 py-2 bg-primary rounded-xl flex-row items-center gap-1"
         >
-           <Plus size={14} /> Sell
-        </button>
-      </div>
+           <Plus size={14} className="text-white" /> 
+           <Text className="text-white text-xs font-bold">Sell</Text>
+        </TouchableOpacity>
+      </Row>
 
       {/* Categories (Only on Home/Search) */}
       {(view === 'home' || view === 'search') && (
-        <div className="flex gap-2 overflow-x-auto no-scrollbar px-1">
-          <button 
-            onClick={() => setSelectedCategory('All')}
-            className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap border ${selectedCategory === 'All' ? 'bg-white text-black border-white' : 'bg-transparent text-slate-400 border-slate-700'}`}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="px-4 gap-2">
+          <TouchableOpacity 
+            onPress={() => setSelectedCategory('All')}
+            className={`px-3 py-1 rounded-full border ${selectedCategory === 'All' ? 'bg-white border-white' : 'bg-transparent border-slate-700'}`}
           >
-            All
-          </button>
+            <Text className={`text-xs font-bold ${selectedCategory === 'All' ? 'text-black' : 'text-slate-400'}`}>All</Text>
+          </TouchableOpacity>
           {CATEGORIES.map(cat => (
-            <button 
+            <TouchableOpacity 
               key={cat.name}
-              onClick={() => setSelectedCategory(cat.name)}
-              className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap border ${selectedCategory === cat.name ? 'bg-white text-black border-white' : 'bg-transparent text-slate-400 border-slate-700'}`}
+              onPress={() => setSelectedCategory(cat.name)}
+              className={`px-3 py-1 rounded-full border mr-2 ${selectedCategory === cat.name ? 'bg-white border-white' : 'bg-transparent border-slate-700'}`}
             >
-              {cat.name}
-            </button>
+              <Text className={`text-xs font-bold ${selectedCategory === cat.name ? 'text-black' : 'text-slate-400'}`}>{cat.name}</Text>
+            </TouchableOpacity>
           ))}
-        </div>
+        </ScrollView>
       )}
-    </div>
+    </View>
   );
 
   // --- Views ---
 
   if (view === 'sell') {
     return (
-        <div className="pb-24 animate-in slide-in-from-bottom">
-            <div className="flex items-center gap-4 px-4 py-4 border-b border-white/5 sticky top-0 bg-background z-20">
-                <button onClick={() => setView('home')} className="p-2 -ml-2 rounded-full hover:bg-white/10"><ArrowLeft size={20} /></button>
-                <h1 className="text-xl font-bold">List Item</h1>
-            </div>
+        <View className="flex-1 h-full pb-24">
+            <Row className="items-center gap-4 px-4 py-4 border-b border-white/5 bg-background z-20">
+                <TouchableOpacity onPress={() => setView('home')} className="p-2 -ml-2 rounded-full hover:bg-white/10">
+                    <ArrowLeft size={20} className="text-white" />
+                </TouchableOpacity>
+                <Text className="text-xl font-bold">List Item</Text>
+            </Row>
             
-            <div className="p-4 space-y-6">
+            <ScrollView contentContainerStyle="p-4 space-y-6">
                 {/* Basic Info */}
-                <div className="space-y-4">
-                    <div className="space-y-2">
-                        <label className="text-sm font-bold text-slate-400">Title</label>
-                        <input 
-                            type="text" 
+                <View className="space-y-4">
+                    <View className="space-y-2">
+                        <Text className="text-sm font-bold text-slate-400">Title</Text>
+                        <TextInput 
                             value={sellForm.title}
                             onChange={(e) => setSellForm({...sellForm, title: e.target.value})}
-                            className="w-full bg-surface border border-white/10 rounded-xl p-3 text-white focus:ring-2 focus:ring-primary/50"
+                            className="w-full bg-surface border border-white/10 rounded-xl p-3 text-white"
                             placeholder="What are you selling?"
                         />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <label className="text-sm font-bold text-slate-400">Price (USDC)</label>
-                            <div className="relative">
+                    </View>
+                    <Row className="gap-4">
+                        <View className="flex-1 space-y-2">
+                            <Text className="text-sm font-bold text-slate-400">Price (USDC)</Text>
+                            <View className="relative">
                                 <DollarSign size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                                <input 
-                                    type="number" 
+                                <TextInput 
+                                    type="number"
                                     value={sellForm.price}
                                     onChange={(e) => setSellForm({...sellForm, price: e.target.value})}
-                                    className="w-full bg-surface border border-white/10 rounded-xl p-3 pl-9 text-white focus:ring-2 focus:ring-primary/50"
+                                    className="w-full bg-surface border border-white/10 rounded-xl p-3 pl-9 text-white"
                                     placeholder="0.00"
                                 />
-                            </div>
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-sm font-bold text-slate-400">Condition</label>
+                            </View>
+                        </View>
+                        <View className="flex-1 space-y-2">
+                            <Text className="text-sm font-bold text-slate-400">Condition</Text>
+                            {/* Shim Select */}
                             <select 
                                 value={sellForm.condition}
                                 onChange={(e) => setSellForm({...sellForm, condition: e.target.value as any})}
-                                className="w-full bg-surface border border-white/10 rounded-xl p-3 text-white focus:ring-2 focus:ring-primary/50"
+                                className="w-full bg-surface border border-white/10 rounded-xl p-3 text-white outline-none"
                             >
-                                <option>New</option>
-                                <option>Open Box</option>
-                                <option>Used</option>
-                                <option>Refurbished</option>
+                                <option className="text-black">New</option>
+                                <option className="text-black">Open Box</option>
+                                <option className="text-black">Used</option>
+                                <option className="text-black">Refurbished</option>
                             </select>
-                        </div>
-                    </div>
-                    <div className="space-y-2">
-                        <label className="text-sm font-bold text-slate-400">Description</label>
+                        </View>
+                    </Row>
+                    <View className="space-y-2">
+                        <Text className="text-sm font-bold text-slate-400">Description</Text>
                         <textarea 
                             value={sellForm.description}
                             onChange={(e) => setSellForm({...sellForm, description: e.target.value})}
-                            className="w-full bg-surface border border-white/10 rounded-xl p-3 text-white focus:ring-2 focus:ring-primary/50 h-32"
+                            className="w-full bg-surface border border-white/10 rounded-xl p-3 text-white h-32 focus:outline-none"
                             placeholder="Describe your item..."
                         />
-                    </div>
-                    <div className="space-y-2">
-                        <label className="text-sm font-bold text-slate-400">Image URL</label>
-                        <div className="relative">
+                    </View>
+                    <View className="space-y-2">
+                        <Text className="text-sm font-bold text-slate-400">Image URL</Text>
+                        <View className="relative">
                             <ImageIcon size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                            <input 
-                                type="text" 
+                            <TextInput 
                                 value={sellForm.imageUrl}
                                 onChange={(e) => setSellForm({...sellForm, imageUrl: e.target.value})}
-                                className="w-full bg-surface border border-white/10 rounded-xl p-3 pl-9 text-white focus:ring-2 focus:ring-primary/50"
+                                className="w-full bg-surface border border-white/10 rounded-xl p-3 pl-9 text-white"
                                 placeholder="https://..."
                             />
-                        </div>
-                    </div>
-                </div>
+                        </View>
+                    </View>
+                </View>
 
                 {/* Location Setup */}
-                <div className="bg-surface/30 border border-white/5 p-4 rounded-2xl">
+                <View className="bg-surface/30 border border-white/5 p-4 rounded-2xl">
                      <LocationPicker 
                         location={sellForm.location} 
                         onChange={(loc) => setSellForm({...sellForm, location: loc})} 
                      />
-                </div>
+                </View>
 
                 {/* Delivery Setup */}
-                <div className="bg-surface/30 border border-white/5 p-4 rounded-2xl space-y-4">
-                    <div className="flex items-center justify-between">
-                         <h3 className="text-sm font-bold text-slate-400">Delivery Options</h3>
-                         <button 
-                           onClick={() => setSellForm({
+                <View className="bg-surface/30 border border-white/5 p-4 rounded-2xl space-y-4">
+                    <Row className="items-center justify-between">
+                         <Text className="text-sm font-bold text-slate-400">Delivery Options</Text>
+                         <TouchableOpacity 
+                           onPress={() => setSellForm({
                                ...sellForm, 
                                shippingOptions: [...sellForm.shippingOptions, { id: 'ship_'+Date.now(), name: 'Express', priceUsd: 20, estimatedDays: '1-2 days'}]
                            })}
-                           className="text-xs text-primary font-bold hover:underline"
                          >
-                             + Add Method
-                         </button>
-                    </div>
+                             <Text className="text-xs text-primary font-bold underline">+ Add Method</Text>
+                         </TouchableOpacity>
+                    </Row>
                     
                     {sellForm.shippingOptions.map((option, idx) => (
-                        <div key={option.id} className="flex items-start gap-2 p-3 bg-black/20 rounded-xl border border-white/5">
-                            <div className="flex-1 space-y-2">
-                                <input 
-                                    type="text" 
+                        <Row key={option.id} className="items-start gap-2 p-3 bg-black/20 rounded-xl border border-white/5">
+                            <View className="flex-1 space-y-2">
+                                <TextInput 
                                     value={option.name}
                                     onChange={(e) => {
                                         const newOpts = [...sellForm.shippingOptions];
                                         newOpts[idx].name = e.target.value;
                                         setSellForm({...sellForm, shippingOptions: newOpts});
                                     }}
-                                    className="w-full bg-transparent border-b border-white/10 text-sm font-bold pb-1 focus:border-primary outline-none"
+                                    className="w-full bg-transparent border-b border-white/10 text-sm font-bold pb-1"
                                     placeholder="Method Name"
                                 />
-                                <div className="flex gap-2">
-                                    <input 
-                                        type="number" 
+                                <Row className="gap-2">
+                                    <TextInput 
+                                        type="number"
                                         value={option.priceUsd}
                                         onChange={(e) => {
                                             const newOpts = [...sellForm.shippingOptions];
                                             newOpts[idx].priceUsd = parseFloat(e.target.value);
                                             setSellForm({...sellForm, shippingOptions: newOpts});
                                         }}
-                                        className="w-20 bg-transparent border-b border-white/10 text-xs pb-1 focus:border-primary outline-none"
+                                        className="w-20 bg-transparent border-b border-white/10 text-xs pb-1"
                                         placeholder="Price ($)"
                                     />
-                                    <input 
-                                        type="text" 
+                                    <TextInput 
                                         value={option.estimatedDays}
                                         onChange={(e) => {
                                             const newOpts = [...sellForm.shippingOptions];
                                             newOpts[idx].estimatedDays = e.target.value;
                                             setSellForm({...sellForm, shippingOptions: newOpts});
                                         }}
-                                        className="flex-1 bg-transparent border-b border-white/10 text-xs pb-1 focus:border-primary outline-none"
+                                        className="flex-1 bg-transparent border-b border-white/10 text-xs pb-1"
                                         placeholder="Time (e.g. 2-3 days)"
                                     />
-                                </div>
-                            </div>
+                                </Row>
+                            </View>
                             {sellForm.shippingOptions.length > 1 && (
-                                <button 
-                                    onClick={() => {
+                                <TouchableOpacity 
+                                    onPress={() => {
                                         const newOpts = sellForm.shippingOptions.filter((_, i) => i !== idx);
                                         setSellForm({...sellForm, shippingOptions: newOpts});
                                     }}
-                                    className="text-slate-500 hover:text-red-400"
                                 >
-                                    <Trash2 size={16} />
-                                </button>
+                                    <Trash2 size={16} className="text-slate-500" />
+                                </TouchableOpacity>
                             )}
-                        </div>
+                        </Row>
                     ))}
-                </div>
+                </View>
 
-                <button 
-                    onClick={handlePublish}
+                <TouchableOpacity 
+                    onPress={handlePublish}
                     disabled={isPublishing || !sellForm.title || !sellForm.price}
-                    className="w-full bg-primary hover:bg-indigo-500 text-white font-bold py-4 rounded-xl shadow-lg shadow-indigo-500/20 flex items-center justify-center gap-2"
+                    className="w-full bg-primary items-center justify-center py-4 rounded-xl shadow-lg shadow-indigo-500/20"
                 >
-                    {isPublishing ? <Loader2 className="animate-spin" /> : 'Publish Item'}
-                </button>
-            </div>
-        </div>
+                    {isPublishing ? <Loader2 className="animate-spin text-white" /> : <Text className="text-white font-bold">Publish Item</Text>}
+                </TouchableOpacity>
+            </ScrollView>
+        </View>
     );
   }
 
@@ -392,126 +389,128 @@ export const BayMarket: React.FC<BayMarketProps> = ({ user }) => {
       const vendorProducts = marketService.getProductsBySeller(viewedSeller.id);
       
       return (
-          <div className="pb-24 animate-in slide-in-from-right">
+          <View className="flex-1 h-full pb-24">
              {/* Header Image / Map Bg */}
-             <div className="h-40 bg-gradient-to-r from-slate-800 to-slate-900 relative overflow-hidden">
+             <View className="h-40 bg-gradient-to-r from-slate-800 to-slate-900 relative overflow-hidden">
                  <div className="absolute inset-0 opacity-20 bg-[url('https://grainy-gradients.vercel.app/noise.svg')]"></div>
                  {/* Simulated Map Background */}
                  <div className="absolute inset-0 opacity-30 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:40px_40px]"></div>
                  
-                 <button onClick={() => setView('home')} className="absolute top-4 left-4 p-2 bg-black/40 backdrop-blur-md rounded-full text-white hover:bg-black/60 z-10">
-                     <ArrowLeft size={20} />
-                 </button>
-             </div>
+                 <TouchableOpacity onPress={() => setView('home')} className="absolute top-4 left-4 p-2 bg-black/40 rounded-full z-10">
+                     <ArrowLeft size={20} className="text-white" />
+                 </TouchableOpacity>
+             </View>
 
              {/* Vendor Info Card */}
-             <div className="px-4 relative -mt-10">
-                 <div className="bg-surface border border-white/10 rounded-2xl p-4 shadow-xl">
-                     <div className="flex items-start justify-between">
-                         <div className="flex items-center gap-3">
-                             <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-600 p-0.5 -mt-8 shadow-lg">
+             <View className="px-4 relative -mt-10">
+                 <View className="bg-surface border border-white/10 rounded-2xl p-4 shadow-xl">
+                     <Row className="items-start justify-between">
+                         <Row className="items-center gap-3">
+                             <View className="w-16 h-16 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-600 p-0.5 -mt-8 shadow-lg overflow-hidden">
                                  {viewedSeller.profileImage ? (
-                                     <img src={viewedSeller.profileImage} className="w-full h-full rounded-full object-cover bg-surface" />
+                                     <Image source={viewedSeller.profileImage} className="w-full h-full rounded-full object-cover bg-surface" />
                                  ) : (
-                                     <div className="w-full h-full rounded-full bg-surface flex items-center justify-center font-bold text-2xl">
-                                         {viewedSeller.name[0]}
-                                     </div>
+                                     <View className="w-full h-full rounded-full bg-surface items-center justify-center">
+                                         <Text className="font-bold text-2xl">{viewedSeller.name[0]}</Text>
+                                     </View>
                                  )}
-                             </div>
-                             <div className="mt-1">
-                                 <h2 className="font-bold text-lg flex items-center gap-1">
-                                     {viewedSeller.username}
+                             </View>
+                             <View className="mt-1">
+                                 <Row className="items-center gap-1">
+                                     <Text className="font-bold text-lg">{viewedSeller.username}</Text>
                                      <CheckCircle size={16} className="text-emerald-400" />
-                                 </h2>
-                                 <div className="flex items-center gap-1 text-xs text-slate-400">
-                                     <MapPin size={12} />
-                                     <span>Member since {new Date(viewedSeller.joinedDate).getFullYear()}</span>
-                                 </div>
-                             </div>
-                         </div>
-                         <div className="text-right">
-                             <div className="flex items-center gap-1 font-bold text-lg justify-end">
+                                 </Row>
+                                 <Row className="items-center gap-1">
+                                     <MapPin size={12} className="text-slate-400" />
+                                     <Text className="text-xs text-slate-400">Member since {new Date(viewedSeller.joinedDate).getFullYear()}</Text>
+                                 </Row>
+                             </View>
+                         </Row>
+                         <View className="items-end">
+                             <Row className="items-center gap-1 justify-end">
                                  <Star size={16} className="fill-yellow-400 text-yellow-400" />
-                                 {viewedSeller.vendorStats?.rating}
-                             </div>
-                             <div className="text-xs text-slate-400">{viewedSeller.vendorStats?.reviewCount} Reviews</div>
-                         </div>
-                     </div>
+                                 <Text className="font-bold text-lg">{viewedSeller.vendorStats?.rating}</Text>
+                             </Row>
+                             <Text className="text-xs text-slate-400">{viewedSeller.vendorStats?.reviewCount} Reviews</Text>
+                         </View>
+                     </Row>
 
                      {/* Badges */}
-                     <div className="flex gap-2 mt-4">
+                     <Row className="gap-2 mt-4">
                          {viewedSeller.vendorStats?.badges.map(badge => (
-                             <span key={badge} className="px-2 py-1 rounded-md bg-indigo-500/10 text-indigo-400 text-[10px] font-bold border border-indigo-500/20">
-                                 {badge}
-                             </span>
+                             <View key={badge} className="px-2 py-1 rounded-md bg-indigo-500/10 border border-indigo-500/20">
+                                 <Text className="text-indigo-400 text-[10px] font-bold">{badge}</Text>
+                             </View>
                          ))}
-                         <span className="px-2 py-1 rounded-md bg-emerald-500/10 text-emerald-400 text-[10px] font-bold border border-emerald-500/20">
-                             {viewedSeller.vendorStats?.totalSales}+ Sales
-                         </span>
-                     </div>
-                 </div>
-             </div>
+                         <View className="px-2 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/20">
+                             <Text className="text-emerald-400 text-[10px] font-bold">{viewedSeller.vendorStats?.totalSales}+ Sales</Text>
+                         </View>
+                     </Row>
+                 </View>
+             </View>
 
+             <ScrollView contentContainerStyle="pb-24">
              {/* Vendor Location Map Block */}
-             <div className="px-4 mt-6">
-                 <h3 className="font-bold text-sm text-slate-400 uppercase mb-2 ml-1">Shipping From</h3>
-                 <div className="w-full h-32 bg-slate-800 rounded-xl border border-white/10 relative overflow-hidden flex items-center justify-center">
+             <View className="px-4 mt-6">
+                 <Text className="font-bold text-sm text-slate-400 uppercase mb-2 ml-1">Shipping From</Text>
+                 <View className="w-full h-32 bg-slate-800 rounded-xl border border-white/10 relative overflow-hidden items-center justify-center">
                       <div className="absolute inset-0 opacity-20 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:20px_20px]"></div>
-                      <div className="flex flex-col items-center text-slate-400 z-10">
+                      <View className="flex-col items-center z-10">
                           <MapPin size={32} className="text-primary mb-1" fill="currentColor" />
-                          <span className="text-sm font-bold text-white">
+                          <Text className="text-sm font-bold text-white">
                              {vendorProducts[0]?.location?.address || "United States"}
-                          </span>
-                      </div>
-                 </div>
-             </div>
+                          </Text>
+                      </View>
+                 </View>
+             </View>
 
              {/* Vendor Listings */}
-             <div className="px-4 mt-6">
-                 <h3 className="font-bold text-sm text-slate-400 uppercase mb-2 ml-1">Active Listings ({vendorProducts.length})</h3>
-                 <div className="grid grid-cols-2 gap-2">
+             <View className="px-4 mt-6">
+                 <Text className="font-bold text-sm text-slate-400 uppercase mb-2 ml-1">Active Listings ({vendorProducts.length})</Text>
+                 <View className="grid grid-cols-2 gap-2">
                      {vendorProducts.map(product => (
                         <Card 
                            key={product.id} 
                            onClick={() => handleProductClick(product)}
-                           className="overflow-hidden cursor-pointer hover:border-primary/50 transition-colors"
+                           className="overflow-hidden"
                         >
-                           <div className="aspect-square w-full bg-white relative">
-                              <img src={product.images[0]} alt={product.title} className="w-full h-full object-cover" />
-                           </div>
-                           <div className="p-3">
-                              <h3 className="font-bold text-xs line-clamp-2 mb-1">{product.title}</h3>
-                              <div className="font-bold text-primary text-xs">{product.price} {product.currency}</div>
-                           </div>
+                           <View className="aspect-square w-full bg-white relative">
+                              <Image source={product.images[0]} className="w-full h-full object-cover" />
+                           </View>
+                           <View className="p-3">
+                              <Text className="font-bold text-xs mb-1 h-8">{product.title}</Text>
+                              <Text className="font-bold text-primary text-xs">{product.price} {product.currency}</Text>
+                           </View>
                         </Card>
                      ))}
-                 </div>
-             </div>
-          </div>
+                 </View>
+             </View>
+             </ScrollView>
+          </View>
       );
   }
 
   if (view === 'success') {
     return (
-      <div className="h-full flex flex-col items-center justify-center p-6 text-center animate-in zoom-in-95">
-        <div className="w-20 h-20 bg-emerald-500/20 rounded-full flex items-center justify-center mb-4">
+      <View className="h-full items-center justify-center p-6">
+        <View className="w-20 h-20 bg-emerald-500/20 rounded-full items-center justify-center mb-4">
           <CheckCircle size={48} className="text-emerald-500" />
-        </div>
-        <h2 className="text-2xl font-bold mb-2">Order Confirmed!</h2>
-        <p className="text-slate-400 text-sm mb-8">
-          Your payment of <span className="text-white font-bold">{selectedProduct?.price} {selectedProduct?.currency}</span> has been sent to {authService.getUserById(selectedProduct?.sellerId || '')?.username}.
-        </p>
-        <button 
-          onClick={() => {
+        </View>
+        <Text className="text-2xl font-bold mb-2">Order Confirmed!</Text>
+        <Text className="text-slate-400 text-sm mb-8 text-center">
+          Your payment of <Text className="text-white font-bold">{selectedProduct?.price} {selectedProduct?.currency}</Text> has been sent to {authService.getUserById(selectedProduct?.sellerId || '')?.username}.
+        </Text>
+        <TouchableOpacity 
+          onPress={() => {
             setSelectedProduct(null);
             setSearchQuery('');
             setView('home');
           }}
-          className="bg-primary hover:bg-indigo-500 text-white font-bold py-3 px-8 rounded-xl transition-colors"
+          className="bg-primary py-3 px-8 rounded-xl"
         >
-          Continue Shopping
-        </button>
-      </div>
+          <Text className="text-white font-bold">Continue Shopping</Text>
+        </TouchableOpacity>
+      </View>
     );
   }
 
@@ -520,234 +519,253 @@ export const BayMarket: React.FC<BayMarketProps> = ({ user }) => {
     const total = (selectedProduct?.price || 0) + (shippingOption?.priceUsd || 0); 
 
     return (
-      <div className="pb-20 animate-in slide-in-from-right">
+      <View className="flex-1 h-full pb-20">
         {renderHeader()}
-        <div className="p-2 space-y-4 mt-2">
-           <h2 className="text-xl font-bold">Review Order</h2>
+        <ScrollView contentContainerStyle="p-2 space-y-4 mt-2">
+           <Text className="text-xl font-bold">Review Order</Text>
            
            {/* Item */}
-           <Card className="p-4 flex gap-4">
-              <img src={selectedProduct?.images[0]} alt={selectedProduct?.title} className="w-16 h-16 rounded-lg object-cover" />
-              <div>
-                 <h3 className="font-bold text-sm line-clamp-2">{selectedProduct?.title}</h3>
-                 <p className="text-primary font-bold mt-1">{selectedProduct?.price} {selectedProduct?.currency}</p>
-              </div>
+           <Card className="p-4">
+              <Row className="gap-4">
+                  <Image source={selectedProduct?.images[0] || ''} className="w-16 h-16 rounded-lg object-cover" />
+                  <View>
+                    <Text className="font-bold text-sm mb-1">{selectedProduct?.title}</Text>
+                    <Text className="text-primary font-bold">{selectedProduct?.price} {selectedProduct?.currency}</Text>
+                  </View>
+              </Row>
            </Card>
 
            {/* Shipping */}
-           <div className="space-y-2">
-              <h3 className="font-bold text-sm text-slate-400 uppercase">Delivery Method</h3>
+           <View className="space-y-2">
+              <Text className="font-bold text-sm text-slate-400 uppercase">Delivery Method</Text>
               
               {/* Local Pickup Option if Available */}
               {selectedProduct?.location?.isLocalPickupAvailable && (
-                  <div 
-                    onClick={() => setSelectedShipping('local_pickup')}
-                    className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer ${selectedShipping === 'local_pickup' ? 'bg-primary/10 border-primary' : 'bg-surface border-white/10'}`}
+                  <TouchableOpacity 
+                    onPress={() => setSelectedShipping('local_pickup')}
+                    className={`p-3 rounded-xl border flex-row items-center justify-between ${selectedShipping === 'local_pickup' ? 'bg-primary/10 border-primary' : 'bg-surface border-white/10'}`}
                   >
-                     <div className="flex items-center gap-2">
-                         <MapPin size={16} />
-                         <div>
-                            <div className="font-bold text-sm">Local Pickup</div>
-                            <div className="text-xs text-slate-400">{selectedProduct.location?.address}</div>
-                         </div>
-                     </div>
-                     <div className="font-bold text-sm">Free</div>
-                  </div>
+                     <Row className="items-center gap-2">
+                         <MapPin size={16} className="text-white" />
+                         <View>
+                            <Text className="font-bold text-sm">Local Pickup</Text>
+                            <Text className="text-xs text-slate-400">{selectedProduct.location?.address}</Text>
+                         </View>
+                     </Row>
+                     <Text className="font-bold text-sm">Free</Text>
+                  </TouchableOpacity>
               )}
 
               {selectedProduct?.shippingOptions.map(opt => (
-                 <div 
+                 <TouchableOpacity 
                    key={opt.id}
-                   onClick={() => setSelectedShipping(opt.id)}
-                   className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer ${selectedShipping === opt.id ? 'bg-primary/10 border-primary' : 'bg-surface border-white/10'}`}
+                   onPress={() => setSelectedShipping(opt.id)}
+                   className={`p-3 rounded-xl border flex-row items-center justify-between ${selectedShipping === opt.id ? 'bg-primary/10 border-primary' : 'bg-surface border-white/10'}`}
                  >
-                    <div className="flex items-center gap-2">
-                       <Truck size={16} />
-                       <div>
-                          <div className="font-bold text-sm">{opt.name}</div>
-                          <div className="text-xs text-slate-400">{opt.estimatedDays}</div>
-                       </div>
-                    </div>
-                    <div className="font-bold text-sm">
+                    <Row className="items-center gap-2">
+                       <Truck size={16} className="text-white" />
+                       <View>
+                          <Text className="font-bold text-sm">{opt.name}</Text>
+                          <Text className="text-xs text-slate-400">{opt.estimatedDays}</Text>
+                       </View>
+                    </Row>
+                    <Text className="font-bold text-sm">
                        {opt.priceUsd === 0 ? 'Free' : `$${opt.priceUsd}`}
-                    </div>
-                 </div>
+                    </Text>
+                 </TouchableOpacity>
               ))}
-           </div>
+           </View>
 
            {/* Summary */}
-           <div className="bg-surface border border-white/10 rounded-xl p-4 space-y-2">
-              <div className="flex justify-between text-sm">
-                 <span className="text-slate-400">Item Subtotal</span>
-                 <span>{selectedProduct?.price} {selectedProduct?.currency}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                 <span className="text-slate-400">Shipping</span>
-                 <span>{selectedShipping === 'local_pickup' ? '$0' : `$${shippingOption?.priceUsd || 0}`}</span>
-              </div>
-              <div className="border-t border-white/10 pt-2 flex justify-between font-bold text-lg">
-                 <span>Total</span>
-                 <span>{selectedShipping === 'local_pickup' ? selectedProduct?.price : total} {selectedProduct?.currency}</span>
-              </div>
-           </div>
+           <View className="bg-surface border border-white/10 rounded-xl p-4 space-y-2">
+              <Row className="justify-between">
+                 <Text className="text-sm text-slate-400">Item Subtotal</Text>
+                 <Text className="text-sm">{selectedProduct?.price} {selectedProduct?.currency}</Text>
+              </Row>
+              <Row className="justify-between">
+                 <Text className="text-sm text-slate-400">Shipping</Text>
+                 <Text className="text-sm">{selectedShipping === 'local_pickup' ? '$0' : `$${shippingOption?.priceUsd || 0}`}</Text>
+              </Row>
+              <View className="border-t border-white/10 pt-2 mt-2">
+                 <Row className="justify-between">
+                    <Text className="font-bold text-lg">Total</Text>
+                    <Text className="font-bold text-lg">{selectedShipping === 'local_pickup' ? selectedProduct?.price : total} {selectedProduct?.currency}</Text>
+                 </Row>
+              </View>
+           </View>
 
-           <div className="flex items-center gap-2 text-xs text-slate-500 justify-center">
-              <ShieldCheck size={14} /> Protected by Nova Escrow
-           </div>
+           <Row className="items-center gap-2 justify-center mt-2">
+              <ShieldCheck size={14} className="text-slate-500" /> 
+              <Text className="text-xs text-slate-500">Protected by Nova Escrow</Text>
+           </Row>
 
-           <button 
-             onClick={handleConfirmPurchase}
+           <TouchableOpacity 
+             onPress={handleConfirmPurchase}
              disabled={isPurchasing}
-             className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-4 rounded-xl shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 disabled:opacity-50"
+             className="w-full bg-emerald-500 items-center justify-center py-4 rounded-xl shadow-lg"
            >
-             {isPurchasing ? <Loader2 className="animate-spin" size={20} /> : `Confirm Payment`}
-           </button>
-        </div>
-      </div>
+             {isPurchasing ? <Loader2 className="animate-spin text-white" size={20} /> : <Text className="text-white font-bold">Confirm Payment</Text>}
+           </TouchableOpacity>
+        </ScrollView>
+      </View>
     );
   }
 
   if (view === 'detail' && selectedProduct) {
-    // Fetch the seller again to ensure we have their latest info (mock)
     const seller = authService.getUserById(selectedProduct.sellerId);
 
     return (
-      <div className="pb-20 animate-in slide-in-from-right">
+      <View className="flex-1 h-full pb-20">
         {renderHeader()}
         
+        <ScrollView>
         {/* Product Images */}
-        <div className="aspect-square w-full bg-white relative">
-           <img src={selectedProduct.images[0]} alt={selectedProduct.title} className="w-full h-full object-contain" />
-           <div className="absolute bottom-4 right-4 bg-black/70 text-white text-xs px-2 py-1 rounded-full">
-              1/{selectedProduct.images.length}
-           </div>
-        </div>
+        <View className="aspect-square w-full bg-white relative">
+           <Image source={selectedProduct.images[0]} className="w-full h-full object-contain" />
+           <View className="absolute bottom-4 right-4 bg-black/70 px-2 py-1 rounded-full">
+              <Text className="text-white text-xs">1/{selectedProduct.images.length}</Text>
+           </View>
+        </View>
 
-        <div className="p-4 space-y-6">
+        <View className="p-4 space-y-6">
            {/* Title & Price */}
-           <div>
-              <h1 className="text-xl font-bold leading-snug">{selectedProduct.title}</h1>
-              <div className="mt-2 flex items-baseline gap-2">
-                 <span className="text-2xl font-bold text-primary">{selectedProduct.price} {selectedProduct.currency}</span>
-                 <span className="text-sm text-slate-400">approx ${selectedProduct.price} USD</span>
-              </div>
-              <div className="mt-2 flex gap-2">
+           <View>
+              <Text className="text-xl font-bold leading-snug">{selectedProduct.title}</Text>
+              <Row className="mt-2 items-baseline gap-2">
+                 <Text className="text-2xl font-bold text-primary">{selectedProduct.price} {selectedProduct.currency}</Text>
+                 <Text className="text-sm text-slate-400">approx ${selectedProduct.price} USD</Text>
+              </Row>
+              <Row className="mt-2 gap-2">
                  {selectedProduct.shippingOptions[0] && (
-                    <div className="inline-flex items-center gap-1 px-2 py-1 bg-surface border border-white/10 rounded text-xs text-slate-300">
-                        <Truck size={12} /> {selectedProduct.shippingOptions[0].name}
-                    </div>
+                    <Row className="items-center gap-1 px-2 py-1 bg-surface border border-white/10 rounded">
+                        <Truck size={12} className="text-slate-300" /> 
+                        <Text className="text-xs text-slate-300">{selectedProduct.shippingOptions[0].name}</Text>
+                    </Row>
                  )}
                  {selectedProduct.location?.isLocalPickupAvailable && (
-                    <div className="inline-flex items-center gap-1 px-2 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded text-xs text-emerald-400">
-                        <MapPin size={12} /> Pickup Available
-                    </div>
+                    <Row className="items-center gap-1 px-2 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded">
+                        <MapPin size={12} className="text-emerald-400" /> 
+                        <Text className="text-xs text-emerald-400">Pickup Available</Text>
+                    </Row>
                  )}
-              </div>
-           </div>
+              </Row>
+           </View>
 
            {/* Vendor Profile */}
-           <div 
-             onClick={() => handleVendorClick(selectedProduct.sellerId)}
-             className="bg-surface/50 border border-white/10 rounded-xl p-4 cursor-pointer hover:bg-surface transition-colors"
+           <TouchableOpacity 
+             onPress={() => handleVendorClick(selectedProduct.sellerId)}
+             className="bg-surface/50 border border-white/10 rounded-xl p-4"
            >
-              <div className="flex items-center justify-between mb-3">
-                 <h3 className="text-xs font-bold text-slate-500 uppercase">Seller Information</h3>
-                 <span className="text-xs text-primary font-bold">View Profile</span>
-              </div>
-              <div className="flex items-center gap-3">
-                 <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-600 p-0.5">
+              <Row className="items-center justify-between mb-3">
+                 <Text className="text-xs font-bold text-slate-500 uppercase">Seller Information</Text>
+                 <Text className="text-xs text-primary font-bold">View Profile</Text>
+              </Row>
+              <Row className="items-center gap-3">
+                 <View className="w-12 h-12 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-600 p-0.5">
                     {seller?.profileImage ? (
-                       <img src={seller.profileImage} className="w-full h-full rounded-full object-cover" />
+                       <Image source={seller.profileImage} className="w-full h-full rounded-full object-cover" />
                     ) : (
-                       <div className="w-full h-full rounded-full bg-slate-800 flex items-center justify-center font-bold text-lg">
-                          {seller?.name[0]}
-                       </div>
+                       <View className="w-full h-full rounded-full bg-slate-800 items-center justify-center">
+                          <Text className="font-bold text-lg">{seller?.name[0]}</Text>
+                       </View>
                     )}
-                 </div>
-                 <div className="flex-1">
-                    <div className="flex items-center gap-1">
-                       <span className="font-bold">{seller?.username}</span>
+                 </View>
+                 <View className="flex-1">
+                    <Row className="items-center gap-1">
+                       <Text className="font-bold text-white">{seller?.username}</Text>
                        <CheckCircle size={14} className="text-emerald-400" />
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-slate-400 mt-0.5">
-                       <span className="flex items-center gap-0.5"><Star size={10} className="fill-yellow-400 text-yellow-400" /> {seller?.vendorStats?.rating}</span>
-                       <span>•</span>
-                       <span>{seller?.vendorStats?.totalSales} Sold</span>
-                    </div>
-                 </div>
-              </div>
+                    </Row>
+                    <Row className="items-center gap-2 mt-0.5">
+                       <Row className="items-center gap-0.5">
+                          <Star size={10} className="fill-yellow-400 text-yellow-400" /> 
+                          <Text className="text-xs text-slate-400">{seller?.vendorStats?.rating}</Text>
+                       </Row>
+                       <Text className="text-xs text-slate-400">•</Text>
+                       <Text className="text-xs text-slate-400">{seller?.vendorStats?.totalSales} Sold</Text>
+                    </Row>
+                 </View>
+              </Row>
               
               {/* Description */}
-              <div className="mt-4 pt-4 border-t border-white/5">
-                 <h3 className="font-bold text-sm mb-2">Description</h3>
-                 <p className="text-sm text-slate-300 leading-relaxed">{selectedProduct.description}</p>
-              </div>
+              <View className="mt-4 pt-4 border-t border-white/5">
+                 <Text className="font-bold text-sm mb-2">Description</Text>
+                 <Text className="text-sm text-slate-300 leading-relaxed">{selectedProduct.description}</Text>
+              </View>
 
               {/* Location Preview */}
-              <div className="mt-4 pt-4 border-t border-white/5">
-                 <h3 className="font-bold text-sm mb-2">Item Location</h3>
-                 <div className="flex items-center gap-2 text-sm text-slate-300">
+              <View className="mt-4 pt-4 border-t border-white/5">
+                 <Text className="font-bold text-sm mb-2">Item Location</Text>
+                 <Row className="items-center gap-2">
                      <MapPin size={16} className="text-slate-500" />
-                     {selectedProduct.location?.address || 'Location not specified'}
-                 </div>
-              </div>
-           </div>
-        </div>
+                     <Text className="text-sm text-slate-300">{selectedProduct.location?.address || 'Location not specified'}</Text>
+                 </Row>
+              </View>
+           </TouchableOpacity>
+        </View>
+        </ScrollView>
 
         {/* Sticky Footer */}
-        <div className="fixed bottom-20 left-0 right-0 p-4 bg-background/90 backdrop-blur-md border-t border-white/10 max-w-md mx-auto">
-           <button 
-             onClick={handleBuyNow}
-             className="w-full bg-primary hover:bg-indigo-500 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-indigo-500/25"
+        <View className="absolute bottom-0 left-0 right-0 p-4 bg-background/90 backdrop-blur-md border-t border-white/10">
+           <TouchableOpacity 
+             onPress={handleBuyNow}
+             className="w-full bg-primary items-center justify-center py-3.5 rounded-xl shadow-lg"
            >
-              Buy Now
-           </button>
-        </div>
-      </div>
+              <Text className="text-white font-bold">Buy Now</Text>
+           </TouchableOpacity>
+        </View>
+      </View>
     );
   }
 
   // --- Home View ---
 
   return (
-    <div className="pb-20 animate-in fade-in">
+    <View className="flex-1 h-full pb-20">
       {renderHeader()}
       
       {/* Content Area */}
-      <div className="p-2 grid grid-cols-2 gap-2 mt-2">
+      <ScrollView contentContainerStyle="p-2">
+        <View className="grid grid-cols-2 gap-2 mt-2">
         {products.length === 0 ? (
-          <div className="col-span-2 text-center py-10 opacity-50">
-             <Search size={32} className="mx-auto mb-2 text-slate-500" />
-             <p className="text-sm">No items found in {selectedCategory}</p>
-          </div>
+          <View className="col-span-2 items-center py-10 opacity-50">
+             <Search size={32} className="mb-2 text-slate-500" />
+             <Text className="text-sm text-slate-500">No items found in {selectedCategory}</Text>
+          </View>
         ) : (
           products.map(product => (
             <Card 
                key={product.id} 
                onClick={() => handleProductClick(product)}
-               className="overflow-hidden cursor-pointer hover:border-primary/50 transition-colors group"
+               className="overflow-hidden"
             >
-               <div className="aspect-square w-full bg-white relative">
-                  <img src={product.images[0]} alt={product.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+               <View className="aspect-square w-full bg-white relative">
+                  <Image source={product.images[0]} className="w-full h-full object-cover" />
                   {product.condition === 'New' && (
-                     <div className="absolute top-2 left-2 bg-emerald-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded">NEW</div>
+                     <View className="absolute top-2 left-2 bg-emerald-500 px-1.5 py-0.5 rounded">
+                       <Text className="text-white text-[10px] font-bold">NEW</Text>
+                     </View>
                   )}
-               </div>
-               <div className="p-3">
-                  <h3 className="font-bold text-sm line-clamp-2 mb-1 h-10">{product.title}</h3>
-                  <div className="font-bold text-primary text-sm">{product.price} {product.currency}</div>
-                  <div className="flex items-center justify-between mt-2 text-[10px] text-slate-400">
-                     <span className="truncate max-w-[80px]">@{authService.getUserById(product.sellerId)?.username}</span>
-                     <span className="flex items-center gap-0.5"><Star size={8} className="fill-yellow-400 text-yellow-400" /> 4.8</span>
-                  </div>
-                  <div className="flex items-center gap-1 mt-1 text-[9px] text-slate-500">
-                     <MapPin size={8} /> {product.location?.address.split(',')[0] || 'Remote'}
-                  </div>
-               </div>
+               </View>
+               <View className="p-3">
+                  <Text className="font-bold text-sm mb-1 h-10" style={{ overflow: 'hidden' }}>{product.title}</Text>
+                  <Text className="font-bold text-primary text-sm">{product.price} {product.currency}</Text>
+                  <Row className="items-center justify-between mt-2">
+                     <Text className="text-[10px] text-slate-400 truncate max-w-[80px]">@{authService.getUserById(product.sellerId)?.username}</Text>
+                     <Row className="items-center gap-0.5">
+                        <Star size={8} className="fill-yellow-400 text-yellow-400" /> 
+                        <Text className="text-[10px] text-slate-400">4.8</Text>
+                     </Row>
+                  </Row>
+                  <Row className="items-center gap-1 mt-1">
+                     <MapPin size={8} className="text-slate-500" /> 
+                     <Text className="text-[9px] text-slate-500">{product.location?.address.split(',')[0] || 'Remote'}</Text>
+                  </Row>
+               </View>
             </Card>
           ))
         )}
-      </div>
-    </div>
+        </View>
+      </ScrollView>
+    </View>
   );
 };

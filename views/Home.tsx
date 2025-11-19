@@ -1,115 +1,249 @@
-import React from 'react';
-import { Asset, User } from '../types';
-import { Card } from '../components/ui/Card';
-import { ArrowUpRight, ArrowDownLeft, ArrowLeftRight, CreditCard, Wallet, LogOut } from 'lucide-react';
+
+import React, { useState, useEffect } from 'react';
+import { Asset, User, ViewState, NFT } from '../types';
+import { View, Text, ScrollView, TouchableOpacity, Row, Image } from '../components/native';
+import { ArrowUpRight, ArrowDownLeft, ArrowLeftRight, CreditCard, Wallet, Bell, RefreshCw, Grid, List, Layers } from 'lucide-react';
 import { AreaChart, Area, ResponsiveContainer } from 'recharts';
+import { cryptoService } from '../services/cryptoService';
 
 interface HomeProps {
   assets: Asset[];
   totalBalance: number;
   user: User | null;
   onLogout: () => void;
+  isRefreshing?: boolean;
+  onRefresh?: () => void;
+  onAssetClick?: (id: string) => void;
+  onNavigate?: (view: ViewState, params?: any) => void;
 }
 
-export const Home: React.FC<HomeProps> = ({ assets, totalBalance, user, onLogout }) => {
+export const Home: React.FC<HomeProps> = ({ assets, totalBalance, user, onLogout, isRefreshing, onRefresh, onAssetClick, onNavigate }) => {
+  const [activeTab, setActiveTab] = useState<'crypto' | 'nfts'>('crypto');
+  const [nfts, setNfts] = useState<NFT[]>([]);
+  const [isLoadingNFTs, setIsLoadingNFTs] = useState(false);
+
+  useEffect(() => {
+    if (activeTab === 'nfts' && nfts.length === 0) {
+      loadNFTs();
+    }
+  }, [activeTab]);
+
+  const loadNFTs = async () => {
+    setIsLoadingNFTs(true);
+    const data = await cryptoService.getUserNFTs();
+    setNfts(data);
+    setIsLoadingNFTs(false);
+  };
+
+  const handleNFTClick = (nft: NFT) => {
+     if (onNavigate) {
+         onNavigate(ViewState.NFT_DETAILS, { nftId: nft.id, nft });
+     }
+  };
+
   return (
-    <div className="p-5 space-y-6 pb-24 animate-in fade-in duration-500">
-      {/* Header / Total Balance */}
-      <div className="space-y-1 mt-4 relative">
-        <div className="flex justify-between items-start">
-           <span className="text-slate-400 text-sm font-medium">
-              Welcome back, {user?.name.split(' ')[0]}
-           </span>
-           <button 
-             onClick={onLogout}
-             className="p-2 bg-surface rounded-full text-slate-400 hover:text-red-400 transition-colors"
-             title="Logout"
+    <View className="flex-1 h-full">
+      {/* Header */}
+      <View className="px-5 py-4 flex-row justify-between items-center z-10">
+         <Row className="items-center gap-3">
+            <View className="w-10 h-10 rounded-full bg-surface border border-white/10 items-center justify-center overflow-hidden">
+               {user?.profileImage ? (
+                 <Image source={user.profileImage} className="w-full h-full object-cover" />
+               ) : (
+                 <Text className="font-bold text-lg">{user?.name[0]}</Text>
+               )}
+            </View>
+            <View>
+               <Text className="text-xs text-slate-400">Welcome back,</Text>
+               <Text className="text-sm font-bold">{user?.name.split(' ')[0]}</Text>
+            </View>
+         </Row>
+         <Row className="gap-3">
+            {onRefresh && (
+                <TouchableOpacity 
+                    onPress={onRefresh}
+                    className={`p-2.5 bg-surface rounded-full border border-white/5 ${isRefreshing ? 'opacity-50' : ''}`}
+                    disabled={isRefreshing}
+                >
+                   <RefreshCw size={20} className={`text-slate-400 ${isRefreshing ? 'animate-spin' : ''}`} />
+                </TouchableOpacity>
+            )}
+            <TouchableOpacity className="p-2.5 bg-surface rounded-full border border-white/5">
+               <Bell size={20} className="text-white" />
+               <View className="absolute top-2 right-2.5 w-2 h-2 bg-red-500 rounded-full border border-surface" />
+            </TouchableOpacity>
+         </Row>
+      </View>
+
+      <ScrollView className="flex-1" contentContainerStyle="pb-32 px-5">
+        
+        {/* Balance Card */}
+        <View className="mt-2 py-6">
+          <Text className="text-slate-400 text-sm font-medium mb-1">Total Balance</Text>
+          <Text className="text-5xl font-bold tracking-tighter mb-4">
+            ${totalBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </Text>
+          <Row className="items-center gap-2 bg-emerald-500/10 self-start px-3 py-1.5 rounded-full border border-emerald-500/20">
+            <ArrowUpRight size={16} className="text-emerald-400" />
+            <Text className="text-emerald-400 text-xs font-bold">+$1,240.50 (2.4%)</Text>
+          </Row>
+        </View>
+
+        {/* Quick Actions */}
+        <Row className="justify-between mb-8">
+          {[
+            { icon: ArrowUpRight, label: 'Send', color: 'bg-primary', view: ViewState.SEND },
+            { icon: ArrowDownLeft, label: 'Receive', color: 'bg-slate-800', view: ViewState.RECEIVE },
+            { icon: ArrowLeftRight, label: 'Swap', color: 'bg-slate-800', view: ViewState.SWAP },
+            { icon: CreditCard, label: 'Buy', color: 'bg-slate-800', view: ViewState.MARKET },
+          ].map((action, i) => (
+            <TouchableOpacity 
+               key={i} 
+               className="items-center gap-2"
+               onPress={() => onNavigate && onNavigate(action.view)}
+            >
+              <View className={`w-16 h-16 rounded-[20px] ${action.color} items-center justify-center shadow-lg shadow-black/40`}>
+                <action.icon className="text-white" size={26} />
+              </View>
+              <Text className="text-xs font-medium text-slate-300">{action.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </Row>
+
+        {/* Tabs */}
+        <View className="flex-row mb-6 p-1 bg-surface rounded-xl border border-white/5">
+           <TouchableOpacity 
+             onPress={() => setActiveTab('crypto')}
+             className={`flex-1 py-2.5 items-center rounded-lg flex-row justify-center gap-2 ${activeTab === 'crypto' ? 'bg-white/10' : ''}`}
            >
-             <LogOut size={16} />
-           </button>
-        </div>
-        
-        <span className="text-slate-400 text-sm font-medium block">Total Balance</span>
-        <h1 className="text-4xl font-bold text-white tracking-tight">
-          ${totalBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-        </h1>
-        <div className="flex items-center gap-2 text-emerald-400 text-sm font-semibold bg-emerald-400/10 px-2 py-1 rounded-lg w-fit">
-          <ArrowUpRight size={16} />
-          <span>+$1,240.50 (2.4%)</span>
-        </div>
-      </div>
+              <List size={16} className={activeTab === 'crypto' ? 'text-white' : 'text-slate-400'} />
+              <Text className={`text-sm font-bold ${activeTab === 'crypto' ? 'text-white' : 'text-slate-400'}`}>Tokens</Text>
+           </TouchableOpacity>
+           <TouchableOpacity 
+             onPress={() => setActiveTab('nfts')}
+             className={`flex-1 py-2.5 items-center rounded-lg flex-row justify-center gap-2 ${activeTab === 'nfts' ? 'bg-white/10' : ''}`}
+           >
+              <Grid size={16} className={activeTab === 'nfts' ? 'text-white' : 'text-slate-400'} />
+              <Text className={`text-sm font-bold ${activeTab === 'nfts' ? 'text-white' : 'text-slate-400'}`}>Collectibles</Text>
+           </TouchableOpacity>
+        </View>
 
-      {/* Quick Actions */}
-      <div className="flex gap-4 justify-between">
-        {[
-          { icon: ArrowUpRight, label: 'Send', color: 'bg-indigo-500' },
-          { icon: ArrowDownLeft, label: 'Receive', color: 'bg-slate-700' },
-          { icon: ArrowLeftRight, label: 'Swap', color: 'bg-slate-700' },
-          { icon: CreditCard, label: 'Buy', color: 'bg-slate-700' },
-        ].map((action, i) => (
-          <button key={i} className="flex flex-col items-center gap-2 group">
-            <div className={`w-14 h-14 rounded-2xl ${action.color} flex items-center justify-center shadow-lg shadow-indigo-500/20 group-active:scale-95 transition-transform`}>
-              <action.icon className="text-white" size={24} />
-            </div>
-            <span className="text-xs font-medium text-slate-300">{action.label}</span>
-          </button>
-        ))}
-      </div>
-
-      {/* Asset List */}
-      <div className="space-y-3">
-        <div className="flex justify-between items-center">
-          <h2 className="text-lg font-bold">Your Assets</h2>
-          <span className="text-primary text-sm font-medium">See All</span>
-        </div>
-        
-        {assets.map((asset) => (
-          <Card key={asset.id} className="flex items-center justify-between p-4 group">
-            <div className="flex items-center gap-4">
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold ${asset.color}`}>
-                {asset.symbol[0]}
-              </div>
-              <div>
-                <h3 className="font-bold text-white">{asset.name}</h3>
-                <span className="text-xs text-slate-400">{asset.balance} {asset.symbol}</span>
-              </div>
-            </div>
+        {/* Content Switch */}
+        {activeTab === 'crypto' ? (
+          <View className="mb-6">
+            <Row className="justify-between items-center mb-4">
+              <Text className="text-lg font-bold">Your Assets</Text>
+              <TouchableOpacity onPress={() => onNavigate && onNavigate(ViewState.MARKET)}>
+                <Text className="text-primary text-sm font-bold">See All</Text>
+              </TouchableOpacity>
+            </Row>
             
-            <div className="w-24 h-10">
-               <ResponsiveContainer width="100%" height="100%">
-                 <AreaChart data={asset.chartData}>
-                   <Area 
-                    type="monotone" 
-                    dataKey="value" 
-                    stroke={asset.change24h >= 0 ? "#10b981" : "#ef4444"} 
-                    fill="transparent" 
-                    strokeWidth={2} 
-                   />
-                 </AreaChart>
-               </ResponsiveContainer>
-            </div>
-
-            <div className="text-right">
-              <div className="font-bold">${(asset.price * asset.balance).toLocaleString()}</div>
-              <div className={`text-xs font-medium ${asset.change24h >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                {asset.change24h > 0 ? '+' : ''}{asset.change24h}%
-              </div>
-            </div>
-          </Card>
-        ))}
-      </div>
+            {assets.length === 0 ? (
+               <View className="items-center py-10">
+                  {isRefreshing ? <Text className="text-slate-500">Loading market data...</Text> : <Text className="text-slate-500">No assets found.</Text>}
+               </View>
+            ) : (
+                <View className="gap-3">
+                  {assets.map((asset) => (
+                    <TouchableOpacity 
+                      key={asset.id} 
+                      onPress={() => onAssetClick && onAssetClick(asset.id)}
+                      className="flex-row items-center justify-between p-4 bg-surface/50 border border-white/5 rounded-2xl active:bg-surface/80"
+                    >
+                      <Row className="items-center gap-4">
+                        <View className={`w-11 h-11 rounded-full items-center justify-center ${asset.color}`}>
+                          <Text className="font-bold text-white">{asset.symbol ? asset.symbol[0] : '?'}</Text>
+                        </View>
+                        <View>
+                          <Text className="font-bold text-base">{asset.name}</Text>
+                          <Text className="text-xs text-slate-400">{asset.balance} {asset.symbol}</Text>
+                        </View>
+                      </Row>
+                      
+                      <View className="w-20 h-10 opacity-50">
+                         {asset.chartData && asset.chartData.length > 0 && (
+                             <ResponsiveContainer width="100%" height="100%">
+                               <AreaChart data={asset.chartData}>
+                                 <Area 
+                                  type="monotone" 
+                                  dataKey="value" 
+                                  stroke={asset.change24h >= 0 ? "#10b981" : "#ef4444"} 
+                                  fill="transparent" 
+                                  strokeWidth={2} 
+                                 />
+                               </AreaChart>
+                             </ResponsiveContainer>
+                         )}
+                      </View>
       
-      {/* Promo Banner */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-purple-600 to-blue-600 p-5 mt-4">
-         <div className="relative z-10">
-            <h3 className="font-bold text-lg mb-1">Invite Friends</h3>
-            <p className="text-sm text-white/80 mb-3">Get $20 in BTC when they sign up.</p>
-            <button className="bg-white text-indigo-600 px-4 py-2 rounded-lg text-xs font-bold shadow-sm">Share Link</button>
-         </div>
-         <div className="absolute -right-4 -bottom-10 opacity-30">
-            <Wallet size={120} />
-         </div>
-      </div>
-    </div>
+                      <View className="items-end">
+                        <Text className="font-bold text-base">${(asset.price * asset.balance).toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
+                        <Text className={`text-xs font-medium ${asset.change24h >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                          {asset.change24h > 0 ? '+' : ''}{asset.change24h}%
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+            )}
+          </View>
+        ) : (
+          <View className="mb-6">
+             <Row className="justify-between items-center mb-4">
+               <Text className="text-lg font-bold">Your Gallery</Text>
+               <View className="px-2 py-1 bg-surface rounded text-xs text-slate-400 border border-white/10">
+                 {nfts.length} items
+               </View>
+             </Row>
+
+             {isLoadingNFTs ? (
+                <View className="items-center py-20">
+                   <Text className="text-slate-500">Loading collectibles...</Text>
+                </View>
+             ) : (
+                <View className="grid grid-cols-2 gap-3">
+                   {nfts.map(nft => (
+                      <TouchableOpacity 
+                         key={nft.id}
+                         onPress={() => handleNFTClick(nft)}
+                         className="bg-surface/50 border border-white/5 rounded-2xl overflow-hidden"
+                      >
+                         <View className="aspect-square w-full bg-slate-800 relative">
+                            <Image source={nft.imageUrl} className="w-full h-full object-cover" />
+                            <View className="absolute top-2 left-2 bg-black/60 backdrop-blur-sm px-2 py-1 rounded-lg">
+                               <Text className="text-[10px] font-bold text-white">{nft.chain}</Text>
+                            </View>
+                         </View>
+                         <View className="p-3">
+                            <Text className="font-bold text-xs mb-1 truncate">{nft.name}</Text>
+                            <Text className="text-[10px] text-slate-400 truncate">{nft.collectionName}</Text>
+                            <Row className="mt-2 items-center gap-1">
+                               <Layers size={10} className="text-indigo-400" />
+                               <Text className="text-[10px] font-bold text-indigo-400">{nft.floorPrice} {nft.currency}</Text>
+                            </Row>
+                         </View>
+                      </TouchableOpacity>
+                   ))}
+                </View>
+             )}
+          </View>
+        )}
+        
+        {/* Promo Banner */}
+        <TouchableOpacity className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-indigo-600 to-blue-600 p-5 mb-4 active:scale-[0.99]">
+           <View className="z-10">
+              <Text className="font-bold text-lg mb-1">Invite Friends</Text>
+              <Text className="text-sm text-white/80 mb-4 max-w-[70%]">Earn $20 in Bitcoin for every friend who joins Nova.</Text>
+              <View className="bg-white self-start px-4 py-2 rounded-full shadow-sm">
+                 <Text className="text-indigo-600 text-xs font-bold">Share Invite Link</Text>
+              </View>
+           </View>
+           <View className="absolute -right-4 -bottom-8 opacity-30 rotate-12">
+              <Wallet size={140} className="text-white" />
+           </View>
+        </TouchableOpacity>
+
+      </ScrollView>
+    </View>
   );
 };

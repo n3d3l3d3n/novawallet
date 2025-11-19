@@ -4,6 +4,7 @@ import { Transaction, Asset, BankingCard } from '../types';
 import { Card } from '../components/ui/Card';
 import { VirtualNumPad } from '../components/ui/VirtualNumPad';
 import { authService } from '../services/authService';
+import { View, Text, ScrollView, TouchableOpacity, Row, TextInput } from '../components/native';
 import { ArrowUpRight, ArrowDownLeft, ArrowLeftRight, CreditCard, Search, Filter, CheckCircle2, Clock, ChevronDown, ChevronUp, ExternalLink, X, Wifi, Plus, ShieldCheck, Loader2 } from 'lucide-react';
 
 interface WalletProps {
@@ -19,12 +20,20 @@ export const Wallet: React.FC<WalletProps> = ({ transactions, assets }) => {
   const [searchQuery, setSearchQuery] = useState('');
   
   // Banking State
-  const currentUser = authService.getCurrentUser();
-  const [cards, setCards] = useState<BankingCard[]>(currentUser?.cards || []);
+  const [cards, setCards] = useState<BankingCard[]>([]);
   const [showPinPad, setShowPinPad] = useState(false);
   const [pin, setPin] = useState('');
   const [nfcMode, setNfcMode] = useState(false);
   const [isProcessingNfc, setIsProcessingNfc] = useState(false);
+
+  // Load cards on mount
+  React.useEffect(() => {
+      const loadCards = async () => {
+          const user = authService.getCurrentUserSync();
+          if (user) setCards(user.cards);
+      };
+      loadCards();
+  }, []);
 
   const toggleExpand = (id: string) => {
     setExpandedId(expandedId === id ? null : id);
@@ -80,331 +89,339 @@ export const Wallet: React.FC<WalletProps> = ({ transactions, assets }) => {
   });
 
   return (
-    <div className="p-5 space-y-6 pb-24 animate-in fade-in duration-500 relative min-h-full">
+    <View className="flex-1 h-full">
+      <ScrollView contentContainerStyle="p-5 pb-24">
       
-      {/* --- Banking Cards Section --- */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-bold">My Cards</h2>
-            <button className="text-xs text-primary font-bold flex items-center gap-1 bg-primary/10 px-2 py-1 rounded-lg">
-                <Plus size={12} /> Add New
-            </button>
-        </div>
-        
-        <div className="flex gap-4 overflow-x-auto no-scrollbar pb-4 snap-x snap-mandatory">
-            {/* Digital Card */}
-            {cards.map(card => (
-                <div key={card.id} className="snap-center shrink-0 w-72 h-44 rounded-2xl bg-gradient-to-br from-slate-800 to-black border border-white/10 p-5 flex flex-col justify-between relative overflow-hidden shadow-xl group cursor-pointer">
-                    {/* Background Elements */}
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl -mr-10 -mt-10"></div>
-                    <div className={`absolute bottom-0 left-0 w-24 h-24 bg-${card.color === 'gold' ? 'yellow' : 'indigo'}-500/20 rounded-full blur-xl -ml-5 -mb-5`}></div>
-                    
-                    <div className="flex justify-between items-start relative z-10">
-                        <span className="font-bold text-lg tracking-wider italic">{card.network}</span>
-                        <Wifi size={24} className="rotate-90 text-slate-400" />
-                    </div>
-                    
-                    <div className="relative z-10">
-                        <div className="flex items-center gap-3 mb-1">
-                             <div className="w-8 h-5 bg-yellow-200/80 rounded flex items-center justify-center overflow-hidden">
-                                 <div className="w-full h-[1px] bg-yellow-600/50 my-[1px]"></div>
-                                 <div className="w-full h-[1px] bg-yellow-600/50 my-[1px]"></div>
-                             </div>
-                             <Wifi size={16} className="text-white rotate-90" />
-                        </div>
-                        <div className="font-mono text-xl tracking-widest text-white shadow-black drop-shadow-md">
-                            •••• •••• •••• {card.last4}
-                        </div>
-                    </div>
+        {/* --- Banking Cards Section --- */}
+        <View>
+          <Row className="items-center justify-between mb-3">
+              <Text className="text-lg font-bold">My Cards</Text>
+              <TouchableOpacity className="flex-row items-center gap-1 bg-primary/10 px-2 py-1 rounded-lg">
+                  <Plus size={12} className="text-primary" /> 
+                  <Text className="text-xs text-primary font-bold">Add New</Text>
+              </TouchableOpacity>
+          </Row>
+          
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} className="pb-4">
+              {/* Digital Card */}
+              {cards.map(card => (
+                  <View key={card.id} className="mr-4 w-72 h-44 rounded-2xl bg-gradient-to-br from-slate-800 to-black border border-white/10 p-5 justify-between relative overflow-hidden shadow-xl">
+                      {/* Background Elements */}
+                      <View className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl -mr-10 -mt-10" />
+                      <View className={`absolute bottom-0 left-0 w-24 h-24 bg-${card.color === 'gold' ? 'yellow' : 'indigo'}-500/20 rounded-full blur-xl -ml-5 -mb-5`} />
+                      
+                      <Row className="justify-between items-start relative z-10">
+                          <Text className="font-bold text-lg tracking-wider italic">{card.network}</Text>
+                          <Wifi size={24} className="rotate-90 text-slate-400" />
+                      </Row>
+                      
+                      <View className="relative z-10">
+                          <Row className="items-center gap-3 mb-1">
+                               <View className="w-8 h-5 bg-yellow-200/80 rounded items-center justify-center overflow-hidden">
+                                   <View className="w-full h-[1px] bg-yellow-600/50 my-[1px]" />
+                                   <View className="w-full h-[1px] bg-yellow-600/50 my-[1px]" />
+                               </View>
+                               <Wifi size={16} className="text-white rotate-90" />
+                          </Row>
+                          <Text className="font-mono text-xl tracking-widest text-white shadow-black drop-shadow-md">
+                              •••• •••• •••• {card.last4}
+                          </Text>
+                      </View>
 
-                    <div className="flex justify-between items-end text-xs text-slate-300 relative z-10">
-                        <div className="flex flex-col">
-                            <span className="text-[8px] opacity-70 uppercase">Card Holder</span>
-                            <span className="font-bold tracking-wide">{card.holderName}</span>
-                        </div>
-                        <div className="flex flex-col items-end">
-                            <span className="text-[8px] opacity-70 uppercase">Expires</span>
-                            <span className="font-bold">{card.expiry}</span>
-                        </div>
-                    </div>
-                </div>
-            ))}
+                      <Row className="justify-between items-end relative z-10">
+                          <View>
+                              <Text className="text-[8px] opacity-70 uppercase text-slate-300">Card Holder</Text>
+                              <Text className="font-bold tracking-wide text-xs text-slate-300">{card.holderName}</Text>
+                          </View>
+                          <View className="items-end">
+                              <Text className="text-[8px] opacity-70 uppercase text-slate-300">Expires</Text>
+                              <Text className="font-bold text-xs text-slate-300">{card.expiry}</Text>
+                          </View>
+                      </Row>
+                  </View>
+              ))}
 
-            {/* Add Card Placeholder */}
-            <div className="snap-center shrink-0 w-12 flex items-center justify-center">
-                <button className="w-10 h-10 rounded-full bg-surface border border-white/10 flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-colors">
-                    <Plus size={20} />
-                </button>
-            </div>
-        </div>
+              {/* Add Card Placeholder */}
+              <View className="w-12 items-center justify-center mr-4">
+                  <TouchableOpacity className="w-10 h-10 rounded-full bg-surface border border-white/10 items-center justify-center">
+                      <Plus size={20} className="text-slate-400" />
+                  </TouchableOpacity>
+              </View>
+          </ScrollView>
 
-        <button 
-            onClick={startNfcPay}
-            className="w-full mt-2 py-3 bg-surface border border-white/10 rounded-xl flex items-center justify-center gap-2 text-sm font-bold text-slate-300 hover:bg-white/5 hover:text-white transition-colors"
-        >
-            <Wifi size={18} className="rotate-90" /> Tap to Pay (NFC)
-        </button>
-      </div>
+          <TouchableOpacity 
+              onPress={startNfcPay}
+              className="w-full mt-2 py-3 bg-surface border border-white/10 rounded-xl flex-row items-center justify-center gap-2"
+          >
+              <Wifi size={18} className="rotate-90 text-slate-300" /> 
+              <Text className="text-sm font-bold text-slate-300">Tap to Pay (NFC)</Text>
+          </TouchableOpacity>
+        </View>
 
 
-      {/* --- Transaction History --- */}
-      <div>
-        <div className="flex items-center justify-between mt-4 mb-4">
-            <h1 className="text-2xl font-bold">History</h1>
-            <div className="flex gap-2">
-            <button 
-                onClick={() => {
-                setIsSearchOpen(!isSearchOpen);
-                if (isSearchOpen) setSearchQuery('');
-                }}
-                className={`p-2 rounded-lg border transition-colors ${isSearchOpen ? 'bg-primary text-white border-primary' : 'bg-surface border-white/10 text-slate-400 hover:text-white'}`}
-            >
-                <Search size={18} />
-            </button>
-            <button 
-                onClick={() => setShowFilters(!showFilters)}
-                className={`p-2 rounded-lg border transition-colors ${showFilters ? 'bg-primary text-white border-primary' : 'bg-surface border-white/10 text-slate-400 hover:text-white active:bg-surface/80'}`}
-            >
-                {showFilters ? <X size={18} /> : <Filter size={18} />}
-            </button>
-            </div>
-        </div>
+        {/* --- Transaction History --- */}
+        <View>
+          <Row className="items-center justify-between mt-6 mb-4">
+              <Text className="text-2xl font-bold">History</Text>
+              <Row className="gap-2">
+              <TouchableOpacity 
+                  onPress={() => {
+                  setIsSearchOpen(!isSearchOpen);
+                  if (isSearchOpen) setSearchQuery('');
+                  }}
+                  className={`p-2 rounded-lg border ${isSearchOpen ? 'bg-primary border-primary' : 'bg-surface border-white/10'}`}
+              >
+                  <Search size={18} className={isSearchOpen ? 'text-white' : 'text-slate-400'} />
+              </TouchableOpacity>
+              <TouchableOpacity 
+                  onPress={() => setShowFilters(!showFilters)}
+                  className={`p-2 rounded-lg border ${showFilters ? 'bg-primary border-primary' : 'bg-surface border-white/10'}`}
+              >
+                  {showFilters ? <X size={18} className="text-white" /> : <Filter size={18} className="text-slate-400" />}
+              </TouchableOpacity>
+              </Row>
+          </Row>
 
-        {/* Search Bar */}
-        {isSearchOpen && (
-            <div className="relative animate-in slide-in-from-top-2 fade-in mb-4">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                <input 
-                autoFocus
-                type="text" 
-                placeholder="Search by symbol (e.g., BTC)..." 
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-surface border border-white/10 rounded-xl py-3 pl-10 pr-4 text-sm text-white focus:outline-none focus:ring-2 focus:ring-primary/50 placeholder:text-slate-500 shadow-lg"
-                />
-            </div>
-        )}
+          {/* Search Bar */}
+          {isSearchOpen && (
+              <View className="mb-4 relative">
+                  <Search className="absolute left-3 top-3 text-slate-400 z-10" size={16} />
+                  <TextInput 
+                    autoFocus
+                    placeholder="Search by symbol (e.g., BTC)..." 
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full bg-surface border border-white/10 rounded-xl py-3 pl-10 pr-4 text-sm text-white"
+                  />
+              </View>
+          )}
 
-        {/* Filter Options */}
-        {showFilters && (
-            <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2 animate-in slide-in-from-top-2 fade-in mb-4">
-            {['all', 'receive', 'send', 'swap', 'buy'].map((type) => (
-                <button
-                key={type}
-                onClick={() => setActiveFilter(type as any)}
-                className={`px-4 py-1.5 rounded-full text-xs font-medium capitalize whitespace-nowrap transition-all duration-300 ${
-                    activeFilter === type 
-                    ? 'bg-white text-black shadow-lg shadow-white/10 scale-105' 
-                    : 'bg-surface text-slate-400 border border-white/10 hover:text-white hover:bg-surface/80'
-                }`}
-                >
-                {type}
-                </button>
-            ))}
-            </div>
-        )}
+          {/* Filter Options */}
+          {showFilters && (
+              <ScrollView horizontal className="mb-4 pb-2">
+                {['all', 'receive', 'send', 'swap', 'buy'].map((type) => (
+                    <TouchableOpacity
+                    key={type}
+                    onPress={() => setActiveFilter(type as any)}
+                    className={`px-4 py-1.5 rounded-full border mr-2 ${
+                        activeFilter === type 
+                        ? 'bg-white border-white' 
+                        : 'bg-surface border-white/10'
+                    }`}
+                    >
+                    <Text className={`text-xs font-medium capitalize ${activeFilter === type ? 'text-black' : 'text-slate-400'}`}>
+                        {type}
+                    </Text>
+                    </TouchableOpacity>
+                ))}
+              </ScrollView>
+          )}
 
-        <div className="space-y-3">
-            {filteredTransactions.length === 0 ? (
-            <div className="text-center py-12 space-y-3 opacity-50">
-                <div className="w-16 h-16 rounded-full bg-surface mx-auto flex items-center justify-center">
-                <Search size={24} className="text-slate-500" />
-                </div>
-                <p className="text-sm text-slate-400">
-                {searchQuery 
-                    ? `No transactions match "${searchQuery}"` 
-                    : `No ${activeFilter !== 'all' ? activeFilter : ''} transactions found`}
-                </p>
-            </div>
-            ) : (
-            filteredTransactions.map((tx) => {
-                const isExpanded = expandedId === tx.id;
-                const assetColor = getAssetColor(tx.assetSymbol);
-                
-                let Icon = ArrowUpRight;
-                let colorClass = 'bg-slate-700';
-                let textClass = 'text-white';
-                let sign = '';
-                let label = '';
+          <View className="gap-3">
+              {filteredTransactions.length === 0 ? (
+              <View className="items-center py-12 opacity-50">
+                  <View className="w-16 h-16 rounded-full bg-surface items-center justify-center mb-3">
+                     <Search size={24} className="text-slate-500" />
+                  </View>
+                  <Text className="text-sm text-slate-400 text-center">
+                  {searchQuery 
+                      ? `No transactions match "${searchQuery}"` 
+                      : `No ${activeFilter !== 'all' ? activeFilter : ''} transactions found`}
+                  </Text>
+              </View>
+              ) : (
+              filteredTransactions.map((tx) => {
+                  const isExpanded = expandedId === tx.id;
+                  const assetColor = getAssetColor(tx.assetSymbol);
+                  
+                  let Icon = ArrowUpRight;
+                  let colorClass = 'bg-slate-700';
+                  let textClass = 'text-white';
+                  let sign = '';
+                  let label = '';
 
-                switch (tx.type) {
-                case 'receive':
-                    Icon = ArrowDownLeft;
-                    colorClass = 'bg-emerald-500/20 text-emerald-400';
-                    textClass = 'text-emerald-400';
-                    sign = '+';
-                    label = 'Received';
-                    break;
-                case 'send':
-                    Icon = ArrowUpRight;
-                    colorClass = 'bg-surface text-slate-300 border border-white/10';
-                    textClass = 'text-white';
-                    sign = '-';
-                    label = 'Sent';
-                    break;
-                case 'swap':
-                    Icon = ArrowLeftRight;
-                    colorClass = 'bg-indigo-500/20 text-indigo-400';
-                    textClass = 'text-white';
-                    label = 'Swapped';
-                    break;
-                case 'buy':
-                    Icon = CreditCard;
-                    colorClass = 'bg-blue-500/20 text-blue-400';
-                    textClass = 'text-blue-400';
-                    sign = '+';
-                    label = 'Bought';
-                    break;
-                }
+                  switch (tx.type) {
+                  case 'receive':
+                      Icon = ArrowDownLeft;
+                      colorClass = 'bg-emerald-500/20';
+                      textClass = 'text-emerald-400';
+                      sign = '+';
+                      label = 'Received';
+                      break;
+                  case 'send':
+                      Icon = ArrowUpRight;
+                      colorClass = 'bg-surface border border-white/10';
+                      textClass = 'text-white';
+                      sign = '-';
+                      label = 'Sent';
+                      break;
+                  case 'swap':
+                      Icon = ArrowLeftRight;
+                      colorClass = 'bg-indigo-500/20';
+                      textClass = 'text-white';
+                      label = 'Swapped';
+                      break;
+                  case 'buy':
+                      Icon = CreditCard;
+                      colorClass = 'bg-blue-500/20';
+                      textClass = 'text-blue-400';
+                      sign = '+';
+                      label = 'Bought';
+                      break;
+                  }
 
-                return (
-                <Card 
-                    key={tx.id} 
-                    onClick={() => toggleExpand(tx.id)}
-                    className="transition-all duration-300"
-                >
-                    <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${colorClass}`}>
-                        <Icon size={18} />
-                        </div>
-                        <div>
-                        <div className="flex items-center gap-1.5 font-bold text-sm text-white">
-                            <span>{label}</span>
-                            <div className={`w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-bold text-white ${assetColor} shadow-sm`}>
-                            {tx.assetSymbol[0]}
-                            </div>
-                            <span>{tx.assetSymbol}</span>
-                        </div>
-                        <div className="text-xs text-slate-400">{tx.date}</div>
-                        </div>
-                    </div>
-                    <div className="text-right">
-                        <div className={`font-bold text-sm ${textClass}`}>
-                        {sign}{tx.amount.toLocaleString()} {tx.assetSymbol}
-                        </div>
-                        <div className="flex items-center justify-end gap-1 text-xs text-slate-500">
-                        ${tx.valueUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-                        </div>
-                    </div>
-                    </div>
+                  return (
+                  <Card 
+                      key={tx.id} 
+                      onClick={() => toggleExpand(tx.id)}
+                  >
+                      <Row className="items-center justify-between">
+                      <Row className="items-center gap-4">
+                          <View className={`w-10 h-10 rounded-full items-center justify-center ${colorClass}`}>
+                             <Icon size={18} className={textClass} />
+                          </View>
+                          <View>
+                          <Row className="items-center gap-1.5">
+                              <Text className="font-bold text-sm text-white">{label}</Text>
+                              <View className={`w-4 h-4 rounded-full items-center justify-center ${assetColor}`}>
+                                <Text className="text-[8px] font-bold text-white">{tx.assetSymbol[0]}</Text>
+                              </View>
+                              <Text className="font-bold text-sm text-white">{tx.assetSymbol}</Text>
+                          </Row>
+                          <Text className="text-xs text-slate-400">{tx.date}</Text>
+                          </View>
+                      </Row>
+                      <View className="items-end">
+                          <Text className={`font-bold text-sm ${textClass}`}>
+                          {sign}{tx.amount.toLocaleString()} {tx.assetSymbol}
+                          </Text>
+                          <Row className="items-center gap-1">
+                            <Text className="text-xs text-slate-500">
+                            ${tx.valueUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </Text>
+                            {isExpanded ? <ChevronUp size={12} className="text-slate-500" /> : <ChevronDown size={12} className="text-slate-500" />}
+                          </Row>
+                      </View>
+                      </Row>
 
-                    {/* Expanded Details */}
-                    {isExpanded && (
-                    <div className="mt-4 pt-4 border-t border-white/5 grid grid-cols-2 gap-4 text-sm animate-in slide-in-from-top-2 fade-in">
-                        
-                        {/* Status */}
-                        <div className="space-y-1">
-                        <span className="text-xs text-slate-500 block">Status</span>
-                        <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
-                            tx.status === 'completed' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-yellow-500/10 text-yellow-400'
-                        }`}>
-                            {tx.status === 'completed' ? <CheckCircle2 size={12} /> : <Clock size={12} />}
-                            <span className="capitalize">{tx.status}</span>
-                        </div>
-                        </div>
+                      {/* Expanded Details */}
+                      {isExpanded && (
+                      <View className="mt-4 pt-4 border-t border-white/5 grid grid-cols-2 gap-4">
+                          
+                          {/* Status */}
+                          <View>
+                          <Text className="text-xs text-slate-500 mb-1">Status</Text>
+                          <Row className={`items-center gap-1.5 px-2.5 py-1 rounded-full self-start ${
+                              tx.status === 'completed' ? 'bg-emerald-500/10' : 'bg-yellow-500/10'
+                          }`}>
+                              {tx.status === 'completed' ? <CheckCircle2 size={12} className="text-emerald-400" /> : <Clock size={12} className="text-yellow-400" />}
+                              <Text className={`text-xs font-medium capitalize ${tx.status === 'completed' ? 'text-emerald-400' : 'text-yellow-400'}`}>
+                                {tx.status}
+                              </Text>
+                          </Row>
+                          </View>
 
-                        {/* Asset */}
-                        <div className="space-y-1">
-                        <span className="text-xs text-slate-500 block">Asset</span>
-                        <div className="flex items-center gap-2">
-                            <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white ${assetColor}`}>
-                            {tx.assetSymbol[0]}
-                            </div>
-                            <span className="font-medium">{tx.assetSymbol} Network</span>
-                        </div>
-                        </div>
+                          {/* Asset */}
+                          <View>
+                          <Text className="text-xs text-slate-500 mb-1">Asset</Text>
+                          <Row className="items-center gap-2">
+                              <View className={`w-5 h-5 rounded-full items-center justify-center ${assetColor}`}>
+                                <Text className="text-[10px] font-bold text-white">{tx.assetSymbol[0]}</Text>
+                              </View>
+                              <Text className="font-medium text-sm text-white">{tx.assetSymbol} Network</Text>
+                          </Row>
+                          </View>
 
-                        {/* Fee (Mock) */}
-                        <div className="space-y-1">
-                        <span className="text-xs text-slate-500 block">Network Fee</span>
-                        <div className="text-slate-300 font-medium">$1.45</div>
-                        </div>
+                          {/* Fee */}
+                          <View>
+                          <Text className="text-xs text-slate-500 mb-1">Network Fee</Text>
+                          <Text className="text-slate-300 font-medium text-sm">$1.45</Text>
+                          </View>
 
-                        {/* Explorer Link */}
-                        <div className="space-y-1">
-                        <span className="text-xs text-slate-500 block">Transaction ID</span>
-                        <div className="flex items-center gap-1 text-primary hover:text-indigo-400 transition-colors cursor-pointer">
-                            <span className="truncate max-w-[80px]">0x7f...3a9</span>
-                            <ExternalLink size={12} />
-                        </div>
-                        </div>
+                          {/* Explorer Link */}
+                          <View>
+                          <Text className="text-xs text-slate-500 mb-1">Transaction ID</Text>
+                          <TouchableOpacity className="flex-row items-center gap-1">
+                              <Text className="text-primary text-sm truncate max-w-[80px]">0x7f...3a9</Text>
+                              <ExternalLink size={12} className="text-primary" />
+                          </TouchableOpacity>
+                          </View>
 
-                    </div>
-                    )}
-                </Card>
-                );
-            })
-            )}
-        </div>
-      </div>
+                      </View>
+                      )}
+                  </Card>
+                  );
+              })
+              )}
+          </View>
+        </View>
+      </ScrollView>
 
       {/* --- PIN Pad Overlay --- */}
       {showPinPad && (
-         <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-lg flex flex-col items-center justify-end pb-8 animate-in slide-in-from-bottom duration-300">
-             <div className="flex-1 flex flex-col items-center justify-center w-full max-w-xs">
+         <View className="absolute inset-0 z-50 bg-black/90 backdrop-blur-lg justify-end pb-8">
+             <View className="flex-1 items-center justify-center w-full">
                  <ShieldCheck size={48} className="text-primary mb-6" />
-                 <h3 className="text-xl font-bold mb-2">Enter Wallet PIN</h3>
-                 <p className="text-slate-400 text-sm mb-8">Authorize NFC Payment</p>
+                 <Text className="text-xl font-bold mb-2">Enter Wallet PIN</Text>
+                 <Text className="text-slate-400 text-sm mb-8">Authorize NFC Payment</Text>
                  
-                 <div className="flex gap-4 mb-10">
+                 <Row className="gap-4 mb-10">
                      {[0, 1, 2, 3].map(i => (
-                         <div key={i} className={`w-4 h-4 rounded-full border border-white/20 ${pin.length > i ? 'bg-white' : 'bg-transparent'}`} />
+                         <View key={i} className={`w-4 h-4 rounded-full border border-white/20 ${pin.length > i ? 'bg-white' : 'bg-transparent'}`} />
                      ))}
-                 </div>
+                 </Row>
                  {pin.length === 4 && (
-                     <button onClick={confirmPin} className="mb-4 text-primary font-bold animate-pulse">
-                         Confirming...
-                     </button>
+                     <TouchableOpacity onPress={confirmPin} className="mb-4">
+                        <Text className="text-primary font-bold animate-pulse">Confirming...</Text>
+                     </TouchableOpacity>
                  )}
-             </div>
+             </View>
              
-             <div className="w-full max-w-md px-4">
+             <View className="w-full px-4">
                  <VirtualNumPad 
                     onPress={handlePinInput} 
                     onDelete={handlePinDelete} 
                  />
-                 <button 
-                   onClick={() => { setShowPinPad(false); setPin(''); }} 
-                   className="w-full mt-4 py-4 text-slate-400 font-medium"
+                 <TouchableOpacity 
+                   onPress={() => { setShowPinPad(false); setPin(''); }} 
+                   className="w-full mt-4 py-4 items-center"
                  >
-                     Cancel
-                 </button>
-             </div>
-         </div>
+                     <Text className="text-slate-400 font-medium">Cancel</Text>
+                 </TouchableOpacity>
+             </View>
+         </View>
       )}
 
       {/* --- NFC Mode Overlay --- */}
       {nfcMode && (
-          <div className="fixed inset-0 z-50 bg-black flex flex-col items-center justify-center animate-in fade-in duration-500">
-              <div className="relative">
-                  <div className="absolute inset-0 bg-primary/30 rounded-full animate-ping" />
-                  <div className="absolute inset-0 bg-primary/20 rounded-full animate-ping animation-delay-500" />
-                  <div className="w-32 h-32 bg-surface border border-white/10 rounded-full flex items-center justify-center relative z-10">
+          <View className="absolute inset-0 z-50 bg-black items-center justify-center">
+              <View className="relative">
+                  <View className="absolute inset-0 bg-primary/30 rounded-full animate-ping" />
+                  <View className="w-32 h-32 bg-surface border border-white/10 rounded-full items-center justify-center relative z-10">
                       <Wifi size={48} className="text-white rotate-90" />
-                  </div>
-              </div>
+                  </View>
+              </View>
               
-              <div className="mt-12 text-center space-y-2">
-                  <h2 className="text-2xl font-bold">Hold near reader</h2>
+              <View className="mt-12 items-center gap-2">
+                  <Text className="text-2xl font-bold">Hold near reader</Text>
                   {isProcessingNfc ? (
-                      <div className="flex items-center justify-center gap-2 text-emerald-400">
-                          <Loader2 className="animate-spin" size={20} /> Processing...
-                      </div>
+                      <Row className="items-center gap-2">
+                          <Loader2 className="animate-spin text-emerald-400" size={20} /> 
+                          <Text className="text-emerald-400">Processing...</Text>
+                      </Row>
                   ) : (
-                      <p className="text-slate-400">Visa •••• 4242</p>
+                      <Text className="text-slate-400">Visa •••• 4242</Text>
                   )}
-              </div>
+              </View>
 
-              <button 
-                 onClick={() => setNfcMode(false)}
-                 className="absolute bottom-12 px-8 py-3 bg-white/10 rounded-full text-white font-medium"
+              <TouchableOpacity 
+                 onPress={() => setNfcMode(false)}
+                 className="absolute bottom-12 px-8 py-3 bg-white/10 rounded-full"
               >
-                  Cancel
-              </button>
-          </div>
+                  <Text className="text-white font-medium">Cancel</Text>
+              </TouchableOpacity>
+          </View>
       )}
-    </div>
+    </View>
   );
 };

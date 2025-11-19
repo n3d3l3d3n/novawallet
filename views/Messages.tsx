@@ -4,7 +4,8 @@ import { ViewState, User, Friend, Group } from '../types';
 import { authService } from '../services/authService';
 import { BayMarket } from './BayMarket';
 import { Card } from '../components/ui/Card';
-import { Search, UserPlus, QrCode, Users, Plus, Hash, Lock, Globe, X, Loader2, Check, ShoppingBag } from 'lucide-react';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, Row } from '../components/native';
+import { Search, UserPlus, QrCode, Users, Plus, ShoppingBag, Check, X, Loader2, Lock, Globe } from 'lucide-react';
 
 interface MessagesProps {
   user: User;
@@ -44,8 +45,7 @@ export const Messages: React.FC<MessagesProps> = ({ user, onNavigate, onSelectCh
     setPublicGroups(authService.getPublicGroups());
   };
 
-  const handleAddFriend = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleAddFriend = async () => {
     setIsLoading(true);
     setAddError('');
     setAddSuccess('');
@@ -54,7 +54,7 @@ export const Messages: React.FC<MessagesProps> = ({ user, onNavigate, onSelectCh
       await authService.addFriend(user.id, addInput);
       setAddSuccess(`Successfully added ${addInput}`);
       setAddInput('');
-      const updatedUser = authService.getCurrentUser();
+      const updatedUser = await authService.getCurrentUser();
       if (updatedUser) {
          setFriends(authService.getFriends(updatedUser.friends));
       }
@@ -111,326 +111,351 @@ export const Messages: React.FC<MessagesProps> = ({ user, onNavigate, onSelectCh
   // Render BayMarket View
   if (activeTab === 'market') {
     return (
-      <div className="h-full relative">
-         <div className="flex items-center justify-between mt-4 px-5">
-          <h1 className="text-2xl font-bold">Social Hub</h1>
-          <div className="flex gap-2">
-             <button className="p-2 bg-surface border border-white/10 rounded-full text-slate-400 hover:text-white">
-               <QrCode size={20} />
-             </button>
-          </div>
-        </div>
+      <View className="flex-1 h-full relative">
+         <Row className="items-center justify-between mt-4 px-5">
+          <Text className="text-2xl font-bold">Social Hub</Text>
+          <Row className="gap-2">
+             <TouchableOpacity className="p-2 bg-surface border border-white/10 rounded-full items-center justify-center">
+               <QrCode size={20} className="text-slate-400" />
+             </TouchableOpacity>
+          </Row>
+        </Row>
 
         {/* Navigation Tabs */}
-        <div className="px-5 mt-4">
-          <div className="flex p-1 bg-surface rounded-xl border border-white/5">
-            <button 
-              onClick={() => setActiveTab('chats')}
-              className="flex-1 py-2 text-xs font-medium rounded-lg transition-all text-slate-400"
+        <View className="px-5 mt-4">
+          <Row className="p-1 bg-surface rounded-xl border border-white/5">
+            <TouchableOpacity 
+              onPress={() => setActiveTab('chats')}
+              className="flex-1 py-2 items-center rounded-lg"
             >
-              Chats
-            </button>
-            <button 
-              onClick={() => setActiveTab('groups')}
-              className="flex-1 py-2 text-xs font-medium rounded-lg transition-all text-slate-400"
+              <Text className="text-xs font-medium text-slate-400">Chats</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              onPress={() => setActiveTab('groups')}
+              className="flex-1 py-2 items-center rounded-lg"
             >
-              Groups
-            </button>
-            <button 
-              onClick={() => setActiveTab('market')}
-              className="flex-1 py-2 text-xs font-medium rounded-lg transition-all flex items-center justify-center gap-1 bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-sm"
+              <Text className="text-xs font-medium text-slate-400">Groups</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              onPress={() => setActiveTab('market')}
+              className="flex-1 py-2 items-center justify-center rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 shadow-sm"
             >
-              <ShoppingBag size={12} /> BayMarket
-            </button>
-          </div>
-        </div>
+              <Row className="items-center gap-1">
+                <ShoppingBag size={12} className="text-white" />
+                <Text className="text-xs font-medium text-white">BayMarket</Text>
+              </Row>
+            </TouchableOpacity>
+          </Row>
+        </View>
 
         {/* Market Component */}
         <BayMarket user={user} />
-      </div>
+      </View>
     );
   }
 
   return (
-    <div className="p-5 space-y-6 pb-24 animate-in fade-in duration-500 relative h-full">
+    <View className="flex-1 h-full p-5 pb-24 relative">
       {/* Header */}
-      <div className="flex items-center justify-between mt-4">
-        <h1 className="text-2xl font-bold">Social Hub</h1>
-        <div className="flex gap-2">
+      <Row className="items-center justify-between mt-4 mb-6">
+        <Text className="text-2xl font-bold">Social Hub</Text>
+        <Row className="gap-2">
            {activeTab === 'chats' ? (
-             <button onClick={() => setIsAddingFriend(true)} className="p-2 bg-primary/20 text-primary rounded-full hover:bg-primary/30 transition-colors">
-               <UserPlus size={20} />
-             </button>
+             <TouchableOpacity onPress={() => setIsAddingFriend(true)} className="p-2 bg-primary/20 rounded-full items-center justify-center">
+               <UserPlus size={20} className="text-primary" />
+             </TouchableOpacity>
            ) : (
-             <button onClick={() => setIsCreatingGroup(true)} className="p-2 bg-primary/20 text-primary rounded-full hover:bg-primary/30 transition-colors">
-               <Plus size={20} />
-             </button>
+             <TouchableOpacity onPress={() => setIsCreatingGroup(true)} className="p-2 bg-primary/20 rounded-full items-center justify-center">
+               <Plus size={20} className="text-primary" />
+             </TouchableOpacity>
            )}
-           <button className="p-2 bg-surface border border-white/10 rounded-full text-slate-400 hover:text-white">
-             <QrCode size={20} />
-           </button>
-        </div>
-      </div>
+           <TouchableOpacity className="p-2 bg-surface border border-white/10 rounded-full items-center justify-center">
+             <QrCode size={20} className="text-slate-400" />
+           </TouchableOpacity>
+        </Row>
+      </Row>
 
       {/* Tabs */}
-      <div className="flex p-1 bg-surface rounded-xl border border-white/5">
-        <button 
-          onClick={() => setActiveTab('chats')}
-          className={`flex-1 py-2 text-xs font-medium rounded-lg transition-all ${activeTab === 'chats' ? 'bg-white/10 text-white shadow-sm' : 'text-slate-400'}`}
+      <Row className="p-1 bg-surface rounded-xl border border-white/5 mb-6">
+        <TouchableOpacity 
+          onPress={() => setActiveTab('chats')}
+          className={`flex-1 py-2 items-center rounded-lg ${activeTab === 'chats' ? 'bg-white/10 shadow-sm' : ''}`}
         >
-          Chats
-        </button>
-        <button 
-          onClick={() => setActiveTab('groups')}
-          className={`flex-1 py-2 text-xs font-medium rounded-lg transition-all ${activeTab === 'groups' ? 'bg-white/10 text-white shadow-sm' : 'text-slate-400'}`}
+          <Text className={`text-xs font-medium ${activeTab === 'chats' ? 'text-white' : 'text-slate-400'}`}>Chats</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          onPress={() => setActiveTab('groups')}
+          className={`flex-1 py-2 items-center rounded-lg ${activeTab === 'groups' ? 'bg-white/10 shadow-sm' : ''}`}
         >
-          Groups
-        </button>
-        <button 
-          onClick={() => setActiveTab('market')}
-          className="flex-1 py-2 text-xs font-medium rounded-lg transition-all flex items-center justify-center gap-1 text-slate-400"
+          <Text className={`text-xs font-medium ${activeTab === 'groups' ? 'text-white' : 'text-slate-400'}`}>Groups</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          onPress={() => setActiveTab('market')}
+          className="flex-1 py-2 items-center justify-center gap-1 rounded-lg"
         >
-          <ShoppingBag size={12} /> BayMarket
-        </button>
-      </div>
+          <Row className="items-center gap-1">
+            <ShoppingBag size={12} className="text-slate-400" />
+            <Text className="text-xs font-medium text-slate-400">BayMarket</Text>
+          </Row>
+        </TouchableOpacity>
+      </Row>
 
       {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-        <input 
-          type="text" 
+      <View className="relative mb-6">
+        <Search className="absolute left-4 top-3 text-slate-400 z-10" size={18} />
+        <TextInput 
           placeholder={activeTab === 'chats' ? "Search friends..." : "Search groups..."}
-          className="w-full bg-surface border border-white/10 rounded-xl py-3 pl-11 pr-4 text-sm text-white focus:outline-none focus:ring-2 focus:ring-primary/50 placeholder:text-slate-500"
+          className="w-full bg-surface border border-white/10 rounded-xl py-3 pl-11 pr-4 text-sm text-white"
         />
-      </div>
+      </View>
 
       {/* Content */}
+      <ScrollView className="flex-1">
       {activeTab === 'chats' ? (
-        <>
+        <View>
           {/* Online Users */}
-          <div className="flex gap-4 overflow-x-auto no-scrollbar py-2">
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-6 pb-2">
              {friends.filter(f => f.status === 'online').length === 0 && (
-                 <p className="text-xs text-slate-500 italic px-2">No friends online</p>
+                 <Text className="text-xs text-slate-500 italic px-2">No friends online</Text>
              )}
              {friends.filter(f => f.status === 'online').map(friend => (
-               <div key={friend.id} className="flex flex-col items-center gap-1 min-w-[60px]">
-                 <div className="relative">
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-600 p-0.5">
-                      <div className="w-full h-full rounded-full bg-surface flex items-center justify-center text-xs font-bold">
-                        {friend.name[0]}
-                      </div>
-                    </div>
-                    <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-background rounded-full flex items-center justify-center">
-                       <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse" />
-                    </div>
-                 </div>
-                 <span className="text-[10px] font-medium truncate w-full text-center">{friend.name.split(' ')[0]}</span>
-               </div>
+               <View key={friend.id} className="items-center gap-1 mr-4 min-w-[60px]">
+                 <View className="relative">
+                    <View className="w-12 h-12 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-600 p-0.5 items-center justify-center">
+                      <View className="w-full h-full rounded-full bg-surface items-center justify-center">
+                        <Text className="text-xs font-bold">{friend.name[0]}</Text>
+                      </View>
+                    </View>
+                    <View className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-background rounded-full items-center justify-center">
+                       <View className="w-2.5 h-2.5 bg-emerald-500 rounded-full" />
+                    </View>
+                 </View>
+                 <Text className="text-[10px] font-medium text-center">{friend.name.split(' ')[0]}</Text>
+               </View>
              ))}
-          </div>
+          </ScrollView>
 
-          <div className="space-y-2">
+          <View className="gap-2">
             {friends.length === 0 ? (
-              <div className="text-center py-12 opacity-50">
-                <Users size={48} className="mx-auto mb-3 text-slate-600" />
-                <p className="text-sm">No friends yet.</p>
-                <button onClick={() => setIsAddingFriend(true)} className="text-primary text-sm mt-2 hover:underline">Add a friend</button>
-              </div>
+              <View className="items-center py-12 opacity-50">
+                <Users size={48} className="text-slate-600 mb-3" />
+                <Text className="text-sm text-slate-400">No friends yet.</Text>
+                <TouchableOpacity onPress={() => setIsAddingFriend(true)}>
+                  <Text className="text-primary text-sm mt-2 font-bold">Add a friend</Text>
+                </TouchableOpacity>
+              </View>
             ) : (
               friends.map(friend => (
                 <Card 
                   key={friend.id} 
                   onClick={() => onSelectChat(friend.id, false)}
-                  className="p-4 flex items-center gap-4 hover:bg-surface/80 active:scale-98 transition-all cursor-pointer"
+                  className="p-4"
                 >
-                  <div className="relative">
-                    <div className="w-12 h-12 rounded-full bg-slate-700 flex items-center justify-center font-bold text-lg">
-                      {friend.name[0]}
-                    </div>
-                    <div className={`absolute bottom-0 right-0 w-3.5 h-3.5 bg-background rounded-full flex items-center justify-center`}>
-                       <div className={`w-2.5 h-2.5 rounded-full ${getStatusColor(friend.status)}`} />
-                    </div>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex justify-between items-baseline">
-                       <h4 className="font-bold text-sm truncate">{friend.name}</h4>
-                       <span className="text-[10px] text-slate-500">{friend.lastSeen}</span>
-                    </div>
-                    <p className="text-xs text-slate-400 truncate">Tap to start chat</p>
-                  </div>
+                  <Row className="items-center gap-4">
+                    <View className="relative">
+                      <View className="w-12 h-12 rounded-full bg-slate-700 items-center justify-center">
+                        <Text className="font-bold text-lg">{friend.name[0]}</Text>
+                      </View>
+                      <View className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-background rounded-full items-center justify-center">
+                         <View className={`w-2.5 h-2.5 rounded-full ${getStatusColor(friend.status)}`} />
+                      </View>
+                    </View>
+                    <View className="flex-1">
+                      <Row className="justify-between items-baseline">
+                         <Text className="font-bold text-sm">{friend.name}</Text>
+                         <Text className="text-[10px] text-slate-500">{friend.lastSeen}</Text>
+                      </Row>
+                      <Text className="text-xs text-slate-400 mt-1">Tap to start chat</Text>
+                    </View>
+                  </Row>
                 </Card>
               ))
             )}
-          </div>
-        </>
+          </View>
+        </View>
       ) : (
-        <>
+        <View>
           {/* My Groups */}
-          <div className="space-y-2">
-             <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1 mb-2">My Groups</h3>
+          <View className="mb-6">
+             <Text className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1 mb-2">My Groups</Text>
              {groups.length === 0 ? (
-               <div className="p-4 bg-surface/30 rounded-xl text-center text-sm text-slate-500">
-                  You haven't joined any groups yet.
-               </div>
+               <View className="p-4 bg-surface/30 rounded-xl items-center">
+                  <Text className="text-sm text-slate-500">You haven't joined any groups yet.</Text>
+               </View>
              ) : (
-               groups.map(group => (
+               <View className="gap-2">
+               {groups.map(group => (
                   <Card 
                     key={group.id} 
                     onClick={() => onSelectChat(group.id, true)}
-                    className="p-4 flex items-center gap-4 hover:bg-surface/80 active:scale-98 transition-all cursor-pointer"
+                    className="p-4"
                   >
-                    <div className="w-12 h-12 rounded-xl bg-surface border border-white/10 flex items-center justify-center text-2xl shadow-sm">
-                       {group.icon}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex justify-between items-baseline">
-                         <h4 className="font-bold text-sm truncate">{group.name}</h4>
-                         <span className="text-[10px] text-slate-500">
-                           {group.lastMessageTime ? new Date(group.lastMessageTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : ''}
-                         </span>
-                      </div>
-                      <p className="text-xs text-slate-400 truncate">{group.lastMessage || 'No messages yet'}</p>
-                    </div>
+                    <Row className="items-center gap-4">
+                      <View className="w-12 h-12 rounded-xl bg-surface border border-white/10 items-center justify-center">
+                         <Text className="text-2xl">{group.icon}</Text>
+                      </View>
+                      <View className="flex-1">
+                        <Row className="justify-between items-baseline">
+                           <Text className="font-bold text-sm">{group.name}</Text>
+                           <Text className="text-[10px] text-slate-500">
+                             {group.lastMessageTime ? new Date(group.lastMessageTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : ''}
+                           </Text>
+                        </Row>
+                        <Text className="text-xs text-slate-400 mt-1">{group.lastMessage || 'No messages yet'}</Text>
+                      </View>
+                    </Row>
                   </Card>
-               ))
+               ))}
+               </View>
              )}
-          </div>
+          </View>
 
           {/* Discover Public Groups */}
-          <div className="space-y-2 mt-4">
-             <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1 mb-2">Discover</h3>
+          <View>
+             <Text className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1 mb-2">Discover</Text>
+             <View className="gap-2">
              {publicGroups.filter(pg => !groups.find(g => g.id === pg.id)).map(group => (
-                <Card key={group.id} className="p-4 flex items-center justify-between">
-                   <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center text-xl">
-                         {group.icon}
-                      </div>
-                      <div>
-                         <h4 className="font-bold text-sm">{group.name}</h4>
-                         <p className="text-xs text-slate-500">{group.members.length} members</p>
-                      </div>
-                   </div>
-                   <button 
-                     onClick={() => handleJoinGroup(group.id)}
-                     className="px-3 py-1.5 bg-surface border border-white/10 rounded-lg text-xs font-bold hover:bg-white hover:text-black transition-colors"
-                   >
-                      Join
-                   </button>
+                <Card key={group.id} className="p-4">
+                   <Row className="items-center justify-between">
+                     <Row className="items-center gap-3">
+                        <View className="w-10 h-10 rounded-xl bg-indigo-500/10 items-center justify-center">
+                           <Text className="text-xl">{group.icon}</Text>
+                        </View>
+                        <View>
+                           <Text className="font-bold text-sm">{group.name}</Text>
+                           <Text className="text-xs text-slate-500">{group.members.length} members</Text>
+                        </View>
+                     </Row>
+                     <TouchableOpacity 
+                       onPress={() => handleJoinGroup(group.id)}
+                       className="px-3 py-1.5 bg-surface border border-white/10 rounded-lg items-center"
+                     >
+                        <Text className="text-xs font-bold">Join</Text>
+                     </TouchableOpacity>
+                   </Row>
                 </Card>
              ))}
-          </div>
-        </>
+             </View>
+          </View>
+        </View>
       )}
+      </ScrollView>
 
       {/* Add Friend Modal */}
       {isAddingFriend && (
-        <div className="absolute inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in">
-           <div className="bg-surface w-full max-w-sm rounded-2xl border border-white/10 p-6 relative shadow-2xl">
-              <button onClick={() => setIsAddingFriend(false)} className="absolute right-4 top-4 text-slate-400 hover:text-white"><X size={20} /></button>
-              <h2 className="text-xl font-bold mb-4">Add Contact</h2>
-              <form onSubmit={handleAddFriend} className="space-y-4">
-                 <input 
+        <View className="absolute inset-0 bg-black/90 z-50 items-center justify-center p-4">
+           <View className="bg-surface w-full max-w-sm rounded-2xl border border-white/10 p-6 relative shadow-2xl">
+              <TouchableOpacity onPress={() => setIsAddingFriend(false)} className="absolute right-4 top-4">
+                  <X size={20} className="text-slate-400" />
+              </TouchableOpacity>
+              <Text className="text-xl font-bold mb-4">Add Contact</Text>
+              
+              <View className="space-y-4">
+                 <TextInput 
                     autoFocus
-                    type="text" 
                     value={addInput}
                     onChange={(e) => setAddInput(e.target.value)}
                     placeholder="@username or +123..."
-                    className="w-full bg-black/30 border border-white/10 rounded-xl py-3 px-4 text-white focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    className="w-full bg-black/30 border border-white/10 rounded-xl py-3 px-4 text-white"
                  />
-                 {addError && <p className="text-red-400 text-xs">{addError}</p>}
-                 {addSuccess && <p className="text-emerald-400 text-xs">{addSuccess}</p>}
-                 <button type="submit" disabled={isLoading || !addInput} className="w-full bg-primary text-white font-bold py-3 rounded-xl">
-                   {isLoading ? <Loader2 className="animate-spin mx-auto" size={16} /> : 'Add User'}
-                 </button>
-              </form>
-           </div>
-        </div>
+                 {addError ? <Text className="text-red-400 text-xs">{addError}</Text> : null}
+                 {addSuccess ? <Text className="text-emerald-400 text-xs">{addSuccess}</Text> : null}
+                 <TouchableOpacity 
+                    onPress={handleAddFriend} 
+                    disabled={isLoading || !addInput} 
+                    className="w-full bg-primary items-center justify-center py-3 rounded-xl"
+                 >
+                   {isLoading ? <Loader2 className="animate-spin text-white" size={16} /> : <Text className="text-white font-bold">Add User</Text>}
+                 </TouchableOpacity>
+              </View>
+           </View>
+        </View>
       )}
 
       {/* Create Group Modal */}
       {isCreatingGroup && (
-        <div className="absolute inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in">
-           <div className="bg-surface w-full max-w-sm rounded-2xl border border-white/10 p-6 relative shadow-2xl max-h-[90vh] overflow-y-auto no-scrollbar">
-              <button onClick={() => setIsCreatingGroup(false)} className="absolute right-4 top-4 text-slate-400 hover:text-white"><X size={20} /></button>
-              <h2 className="text-xl font-bold mb-6">Create Group</h2>
+        <View className="absolute inset-0 bg-black/90 z-50 items-center justify-center p-4">
+           <View className="bg-surface w-full max-w-sm rounded-2xl border border-white/10 p-6 relative shadow-2xl max-h-[90vh]">
+              <TouchableOpacity onPress={() => setIsCreatingGroup(false)} className="absolute right-4 top-4">
+                  <X size={20} className="text-slate-400" />
+              </TouchableOpacity>
+              <Text className="text-xl font-bold mb-6">Create Group</Text>
               
-              <div className="space-y-4">
+              <ScrollView className="space-y-4">
                  {/* Icon & Name */}
-                 <div className="flex gap-3">
-                    <input 
-                       type="text" 
+                 <Row className="gap-3 mb-4">
+                    <TextInput 
                        value={groupIcon}
                        onChange={(e) => setGroupIcon(e.target.value)}
-                       className="w-14 text-center bg-black/30 border border-white/10 rounded-xl py-3 text-2xl focus:outline-none"
+                       className="w-14 text-center bg-black/30 border border-white/10 rounded-xl py-3 text-2xl"
                        maxLength={2}
                     />
-                    <input 
-                       type="text" 
+                    <TextInput 
                        value={groupName}
                        onChange={(e) => setGroupName(e.target.value)}
                        placeholder="Group Name"
-                       className="flex-1 bg-black/30 border border-white/10 rounded-xl py-3 px-4 text-white focus:outline-none focus:ring-2 focus:ring-primary/50"
+                       className="flex-1 bg-black/30 border border-white/10 rounded-xl py-3 px-4 text-white"
                     />
-                 </div>
+                 </Row>
 
                  {/* Type */}
-                 <div className="grid grid-cols-2 gap-3">
-                    <button 
-                      onClick={() => setGroupType('private')}
-                      className={`p-3 rounded-xl border text-left flex flex-col gap-2 ${groupType === 'private' ? 'bg-primary/20 border-primary text-primary' : 'bg-black/30 border-white/10 text-slate-400'}`}
+                 <Row className="gap-3 mb-4">
+                    <TouchableOpacity 
+                      onPress={() => setGroupType('private')}
+                      className={`flex-1 p-3 rounded-xl border ${groupType === 'private' ? 'bg-primary/20 border-primary' : 'bg-black/30 border-white/10'}`}
                     >
-                       <Lock size={20} />
-                       <div>
-                          <div className="text-xs font-bold">Private</div>
-                          <div className="text-[10px] opacity-70">Invite only</div>
-                       </div>
-                    </button>
-                    <button 
-                      onClick={() => setGroupType('public')}
-                      className={`p-3 rounded-xl border text-left flex flex-col gap-2 ${groupType === 'public' ? 'bg-primary/20 border-primary text-primary' : 'bg-black/30 border-white/10 text-slate-400'}`}
+                       <Lock size={20} className={groupType === 'private' ? 'text-primary' : 'text-slate-400'} />
+                       <View className="mt-2">
+                          <Text className={`text-xs font-bold ${groupType === 'private' ? 'text-primary' : 'text-slate-400'}`}>Private</Text>
+                          <Text className="text-[10px] opacity-70 text-slate-500">Invite only</Text>
+                       </View>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      onPress={() => setGroupType('public')}
+                      className={`flex-1 p-3 rounded-xl border ${groupType === 'public' ? 'bg-primary/20 border-primary' : 'bg-black/30 border-white/10'}`}
                     >
-                       <Globe size={20} />
-                       <div>
-                          <div className="text-xs font-bold">Public</div>
-                          <div className="text-[10px] opacity-70">Anyone can join</div>
-                       </div>
-                    </button>
-                 </div>
+                       <Globe size={20} className={groupType === 'public' ? 'text-primary' : 'text-slate-400'} />
+                       <View className="mt-2">
+                          <Text className={`text-xs font-bold ${groupType === 'public' ? 'text-primary' : 'text-slate-400'}`}>Public</Text>
+                          <Text className="text-[10px] opacity-70 text-slate-500">Anyone can join</Text>
+                       </View>
+                    </TouchableOpacity>
+                 </Row>
 
                  {/* Members */}
-                 <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-500 uppercase">Add Members</label>
-                    <div className="max-h-40 overflow-y-auto space-y-2 pr-2">
+                 <View className="space-y-2">
+                    <Text className="text-xs font-bold text-slate-500 uppercase">Add Members</Text>
+                    <ScrollView className="max-h-40 pr-2">
                        {friends.map(friend => (
-                          <div 
+                          <TouchableOpacity 
                              key={friend.id}
-                             onClick={() => toggleMemberSelection(friend.id)}
-                             className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all ${selectedMembers.includes(friend.id) ? 'bg-primary/10 border-primary' : 'bg-black/30 border-white/5 hover:bg-white/5'}`}
+                             onPress={() => toggleMemberSelection(friend.id)}
+                             className={`flex-row items-center justify-between p-3 rounded-xl border mb-2 ${selectedMembers.includes(friend.id) ? 'bg-primary/10 border-primary' : 'bg-black/30 border-white/5'}`}
                           >
-                             <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold">
-                                   {friend.name[0]}
-                                </div>
-                                <span className="text-sm font-medium">{friend.name}</span>
-                             </div>
+                             <Row className="items-center gap-3">
+                                <View className="w-8 h-8 rounded-full bg-slate-700 items-center justify-center">
+                                   <Text className="text-xs font-bold">{friend.name[0]}</Text>
+                                </View>
+                                <Text className="text-sm font-medium">{friend.name}</Text>
+                             </Row>
                              {selectedMembers.includes(friend.id) && <Check size={16} className="text-primary" />}
-                          </div>
+                          </TouchableOpacity>
                        ))}
-                       {friends.length === 0 && <p className="text-xs text-slate-500 text-center py-2">No friends to add.</p>}
-                    </div>
-                 </div>
+                       {friends.length === 0 && <Text className="text-xs text-slate-500 text-center py-2">No friends to add.</Text>}
+                    </ScrollView>
+                 </View>
 
-                 <button 
-                   onClick={handleCreateGroup}
+                 <TouchableOpacity 
+                   onPress={handleCreateGroup}
                    disabled={isLoading || !groupName}
-                   className="w-full bg-primary hover:bg-indigo-500 text-white font-bold py-3 rounded-xl mt-4 disabled:opacity-50"
+                   className="w-full bg-primary items-center justify-center py-3 rounded-xl mt-4"
                  >
-                   {isLoading ? <Loader2 className="animate-spin mx-auto" size={16} /> : 'Create Group'}
-                 </button>
-              </div>
-           </div>
-        </div>
+                   {isLoading ? <Loader2 className="animate-spin text-white" size={16} /> : <Text className="text-white font-bold">Create Group</Text>}
+                 </TouchableOpacity>
+              </ScrollView>
+           </View>
+        </View>
       )}
-    </div>
+    </View>
   );
 };

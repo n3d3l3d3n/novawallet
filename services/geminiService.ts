@@ -1,23 +1,24 @@
+
 import { GoogleGenAI, Chat } from "@google/genai";
 
 const apiKey = process.env.API_KEY || '';
 const ai = new GoogleGenAI({ apiKey });
 
-const SYSTEM_INSTRUCTION = `You are Nova, an advanced AI Market Analyst and Crypto Assistant embedded in a next-gen mobile wallet.
+const SYSTEM_INSTRUCTION = `You are Nova, an elite AI Crypto Market Analyst embedded in a next-gen mobile wallet.
 
-Your Core Capabilities:
-1. **Market Analysis:** Analyze trends (Bullish/Bearish), identifying support/resistance levels, and market sentiment.
-2. **Asset Insights:** Provide detailed breakdowns of specific cryptocurrencies (Fundamentals, Tokenomics, Recent News).
-3. **Portfolio Intelligence:** Offer risk assessments and diversification tips based on user queries.
+**Your Access & Capabilities:**
+1. **Real-Time Context:** You have access to the user's portfolio holdings and live market prices (provided in the message context). Use this to give specific, mathematical answers.
+2. **Market Analysis:** Analyze trends (Bullish/Bearish) and identify support/resistance levels.
+3. **Risk Management:** Offer tips on diversification and portfolio health.
 
-Response Style:
-- **Professional yet Accessible:** Use clear, concise language suitable for mobile reading.
-- **Structured:** Use bullet points, emojis for visual cues (e.g., 📈, 📉, ⚠️), and short paragraphs.
-- **No Financial Advice:** Always frame analysis as educational or data-driven observation. Never say "Buy" or "Sell". Use "Consider watching," "Strong momentum," or "Caution advised."
+**Response Guidelines:**
+- **Be Concise:** Mobile users skim. Use bullet points and emojis (📈, 📉, 🛡️).
+- **Be Personalized:** If the user owns an asset, reference their specific balance/value in your answer.
+- **No Financial Advice:** Frame analysis as "observation" or "educational". Use "Consider watching" instead of "Buy".
+- **Formatting:** Use bolding for prices and key terms.
 
-Context:
-- You are inside the "Nova Wallet" app.
-- If asked about the market, assume standard current market conditions or ask for clarification if the user wants real-time data (which you simulate based on your training data cutoff or general principles).
+**Current Persona:**
+You are professional, slightly futuristic, and highly analytical.
 `;
 
 let chatSession: Chat | null = null;
@@ -34,13 +35,20 @@ export const getChatSession = (): Chat => {
   return chatSession;
 };
 
-export const sendMessageToGemini = async (message: string): Promise<string> => {
+export const sendMessageToGemini = async (message: string, marketContext?: string): Promise<string> => {
   try {
     const chat = getChatSession();
-    const response = await chat.sendMessage({ message });
+    
+    // If context is provided, we prepend it to the user's message as a "System Note" 
+    // This is a RAG-lite approach to give the model current state awareness.
+    const fullPrompt = marketContext 
+      ? `[SYSTEM_DATA: The following is the current live market and user portfolio data. Use this to answer the user's question accurately: ${marketContext}] \n\n USER_QUESTION: ${message}`
+      : message;
+
+    const response = await chat.sendMessage({ message: fullPrompt });
     return response.text || "I couldn't generate a response at this time.";
   } catch (error) {
     console.error("Gemini API Error:", error);
-    return "Sorry, I'm having trouble connecting to the network right now.";
+    return "I'm having trouble connecting to the neural network. Please check your internet connection.";
   }
 };

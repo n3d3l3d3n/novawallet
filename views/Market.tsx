@@ -1,6 +1,8 @@
+
 import React, { useState } from 'react';
 import { Asset } from '../types';
 import { Card } from '../components/ui/Card';
+import { View, Text, ScrollView, TouchableOpacity, Row, TextInput } from '../components/native';
 import { Search, Star } from 'lucide-react';
 
 interface MarketProps {
@@ -16,58 +18,65 @@ export const Market: React.FC<MarketProps> = ({ assets }) => {
   );
 
   return (
-    <div className="p-5 space-y-6 pb-24 animate-in slide-in-from-right-10 duration-500">
-      <h1 className="text-2xl font-bold mt-4">Market</h1>
-      
-      <div className="relative">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
-        <input 
-          type="text" 
-          placeholder="Search coins..." 
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full bg-surface border border-white/10 rounded-xl py-3 pl-12 pr-4 text-white focus:outline-none focus:ring-2 focus:ring-primary/50 placeholder:text-slate-500"
-        />
-      </div>
-
-      <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
-        {['All', 'Watchlist', 'Gainers', 'Losers', 'New'].map((tab, i) => (
-            <button 
-              key={tab} 
-              className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap ${i === 0 ? 'bg-white text-black' : 'bg-surface text-slate-300 border border-white/5'}`}
-            >
-              {tab}
-            </button>
-        ))}
-      </div>
-
-      <div className="space-y-1">
-        <div className="flex justify-between px-2 text-xs text-slate-500 font-medium uppercase tracking-wider mb-2">
-          <span>Name</span>
-          <span className="text-right">Price / 24h</span>
-        </div>
+    <View className="flex-1 h-full">
+      <ScrollView contentContainerStyle="p-5 pb-24">
+        <Text className="text-2xl font-bold mt-4 mb-6">Market</Text>
         
-        {filteredAssets.map((asset) => (
-          <Card key={asset.id} className="flex items-center justify-between py-3 px-4 active:bg-surface/80 transition-colors">
-            <div className="flex items-center gap-3">
-               <Star size={16} className="text-slate-600" />
-               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white ${asset.color}`}>
-                {asset.symbol[0]}
-              </div>
-              <div>
-                <h3 className="font-bold text-sm">{asset.name}</h3>
-                <span className="text-xs text-slate-400">{asset.symbol}</span>
-              </div>
-            </div>
-            <div className="text-right">
-              <div className="font-semibold text-sm">${asset.price.toLocaleString()}</div>
-              <div className={`text-xs font-medium ${asset.change24h >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                {asset.change24h > 0 ? '+' : ''}{asset.change24h}%
-              </div>
-            </div>
-          </Card>
-        ))}
-      </div>
-    </div>
+        <View className="mb-6 relative">
+          <Search className="absolute left-4 top-3 text-slate-400 z-10" size={20} />
+          <TextInput 
+            placeholder="Search coins..." 
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full bg-surface border border-white/10 rounded-xl py-3 pl-12 pr-4 text-white"
+          />
+        </View>
+
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-6 pb-1">
+          {['All', 'Watchlist', 'Gainers', 'Losers', 'New'].map((tab, i) => (
+              <TouchableOpacity 
+                key={tab} 
+                className={`px-4 py-1.5 rounded-full mr-2 border ${i === 0 ? 'bg-white border-white' : 'bg-surface border-white/5'}`}
+              >
+                <Text className={`text-sm font-medium whitespace-nowrap ${i === 0 ? 'text-black' : 'text-slate-300'}`}>
+                  {tab}
+                </Text>
+              </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        <View>
+          <Row className="justify-between px-2 mb-2">
+            <Text className="text-xs text-slate-500 font-medium uppercase tracking-wider">Name</Text>
+            <Text className="text-xs text-slate-500 font-medium uppercase tracking-wider text-right">Price / 24h</Text>
+          </Row>
+          
+          <View className="gap-1">
+            {filteredAssets.map((asset) => (
+              <Card key={asset.id} className="py-3 px-4">
+                <Row className="items-center justify-between">
+                    <Row className="items-center gap-3">
+                      <Star size={16} className="text-slate-600" />
+                      <View className={`w-8 h-8 rounded-full items-center justify-center ${asset.color}`}>
+                        <Text className="text-xs font-bold text-white">{asset.symbol[0]}</Text>
+                      </View>
+                      <View>
+                        <Text className="font-bold text-sm text-white">{asset.name}</Text>
+                        <Text className="text-xs text-slate-400">{asset.symbol}</Text>
+                      </View>
+                    </Row>
+                    <View className="items-end">
+                      <Text className="font-semibold text-sm text-white">${asset.price.toLocaleString()}</Text>
+                      <Text className={`text-xs font-medium ${asset.change24h >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                        {asset.change24h > 0 ? '+' : ''}{asset.change24h}%
+                      </Text>
+                    </View>
+                </Row>
+              </Card>
+            ))}
+          </View>
+        </View>
+      </ScrollView>
+    </View>
   );
 };

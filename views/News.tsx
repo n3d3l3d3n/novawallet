@@ -1,7 +1,9 @@
+
 import React from 'react';
 import { ViewState, NewsItem } from '../types';
 import { ChevronLeft, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { Card } from '../components/ui/Card';
+import { View, Text, ScrollView, TouchableOpacity, Row, Image } from '../components/native';
 
 interface NewsProps {
   onNavigate: (view: ViewState) => void;
@@ -61,53 +63,55 @@ export const News: React.FC<NewsProps> = ({ onNavigate }) => {
   };
 
   return (
-    <div className="p-5 space-y-6 pb-24 animate-in slide-in-from-right duration-300">
-      <div className="flex items-center gap-4 mt-4">
-        <button onClick={() => onNavigate(ViewState.PROFILE)} className="p-2 rounded-full hover:bg-white/10">
-           <ChevronLeft size={24} />
-        </button>
-        <h1 className="text-2xl font-bold">Crypto News</h1>
-      </div>
+    <View className="flex-1 h-full">
+      <ScrollView contentContainerStyle="p-5 pb-24">
+        <Row className="items-center gap-4 mt-4 mb-6">
+          <TouchableOpacity onPress={() => onNavigate(ViewState.PROFILE)} className="p-2 rounded-full hover:bg-white/10">
+             <ChevronLeft size={24} className="text-white" />
+          </TouchableOpacity>
+          <Text className="text-2xl font-bold">Crypto News</Text>
+        </Row>
 
-      {/* Categories */}
-      <div className="flex gap-2 overflow-x-auto no-scrollbar">
-        {['All', 'Market', 'Regulation', 'Tech', 'Metaverse'].map((cat, i) => (
-           <button 
-             key={cat} 
-             className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap ${i === 0 ? 'bg-white text-black' : 'bg-surface text-slate-300 border border-white/5'}`}
-           >
-             {cat}
-           </button>
-        ))}
-      </div>
+        {/* Categories */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-6 pb-2">
+          {['All', 'Market', 'Regulation', 'Tech', 'Metaverse'].map((cat, i) => (
+             <TouchableOpacity 
+               key={cat} 
+               className={`px-4 py-1.5 rounded-full mr-2 border ${i === 0 ? 'bg-white border-white' : 'bg-surface border-white/5'}`}
+             >
+               <Text className={`text-sm font-medium ${i === 0 ? 'text-black' : 'text-slate-300'}`}>{cat}</Text>
+             </TouchableOpacity>
+          ))}
+        </ScrollView>
 
-      {/* News List */}
-      <div className="space-y-3">
-         {MOCK_NEWS.map((item) => (
-            <Card key={item.id} className="p-4 hover:bg-surface/80 transition-colors cursor-pointer">
-               <div className="flex justify-between items-start gap-3">
-                  <div>
-                     <div className="flex items-center gap-2 mb-2">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-400">{item.category}</span>
-                        <span className="w-1 h-1 rounded-full bg-slate-600" />
-                        <span className="text-[10px] text-slate-400">{item.time}</span>
-                     </div>
-                     <h3 className="font-bold text-sm leading-snug mb-2">{item.title}</h3>
-                     <div className="flex items-center gap-3">
-                        <span className="text-xs text-slate-500">{item.source}</span>
-                        <div className="flex items-center gap-1 px-2 py-0.5 bg-white/5 rounded text-xs font-medium">
-                           {getSentimentIcon(item.sentiment)}
-                           <span className={`${item.sentiment === 'Positive' ? 'text-emerald-400' : item.sentiment === 'Negative' ? 'text-red-400' : 'text-slate-400'}`}>
-                             {item.sentiment}
-                           </span>
-                        </div>
-                     </div>
-                  </div>
-                  <div className="w-16 h-16 bg-slate-700 rounded-lg flex-shrink-0" />
-               </div>
-            </Card>
-         ))}
-      </div>
-    </div>
+        {/* News List */}
+        <View className="gap-3">
+           {MOCK_NEWS.map((item) => (
+              <Card key={item.id} className="p-4">
+                 <Row className="items-start gap-3 justify-between">
+                    <View className="flex-1">
+                       <Row className="items-center gap-2 mb-2">
+                          <Text className="text-[10px] font-bold uppercase tracking-wider text-indigo-400">{item.category}</Text>
+                          <View className="w-1 h-1 rounded-full bg-slate-600" />
+                          <Text className="text-[10px] text-slate-400">{item.time}</Text>
+                       </Row>
+                       <Text className="font-bold text-sm leading-snug mb-2">{item.title}</Text>
+                       <Row className="items-center gap-3">
+                          <Text className="text-xs text-slate-500">{item.source}</Text>
+                          <Row className="items-center gap-1 px-2 py-0.5 bg-white/5 rounded">
+                             {getSentimentIcon(item.sentiment)}
+                             <Text className={`text-xs font-medium ${item.sentiment === 'Positive' ? 'text-emerald-400' : item.sentiment === 'Negative' ? 'text-red-400' : 'text-slate-400'}`}>
+                               {item.sentiment}
+                             </Text>
+                          </Row>
+                       </Row>
+                    </View>
+                    <View className="w-16 h-16 bg-slate-700 rounded-lg" />
+                 </Row>
+              </Card>
+           ))}
+        </View>
+      </ScrollView>
+    </View>
   );
 };

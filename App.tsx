@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { ViewState, Asset, Transaction, User, ConnectedApp } from './types';
+import { ViewState, Asset, Transaction, User, ConnectedApp, NFT } from './types';
+import { SafeAreaView, StatusBar, View } from './components/native';
 import { Navigation } from './components/Navigation';
 import { Home } from './views/Home';
 import { Market } from './views/Market';
@@ -18,99 +19,115 @@ import { Chat } from './views/Chat';
 import { DarkBrowser } from './views/DarkBrowser';
 import { ConnectedApps } from './views/ConnectedApps';
 import { ConnectRequest } from './views/ConnectRequest';
+import { Security } from './views/Security';
+import { Legal } from './views/Legal';
+import { Notifications } from './views/Notifications';
+import { Support } from './views/Support';
+import { AssetDetails } from './views/AssetDetails';
+import { NFTDetails } from './views/NFTDetails';
+import { Transfer } from './views/Transfer';
+import { Swap } from './views/Swap';
 import { authService } from './services/authService';
+import { cryptoService } from './services/cryptoService';
+import { supabase } from './services/supabaseClient';
 
-// Mock Data
-const INITIAL_ASSETS: Asset[] = [
-  {
-    id: '1',
-    symbol: 'BTC',
-    name: 'Bitcoin',
-    balance: 0.42,
-    price: 64230.50,
-    change24h: 2.4,
-    color: 'bg-orange-500',
-    chartData: Array.from({ length: 20 }, (_, i) => ({ value: 60000 + Math.random() * 5000 + i * 100 }))
-  },
-  {
-    id: '2',
-    symbol: 'ETH',
-    name: 'Ethereum',
-    balance: 4.5,
-    price: 3450.20,
-    change24h: -1.2,
-    color: 'bg-blue-600',
-    chartData: Array.from({ length: 20 }, (_, i) => ({ value: 3200 + Math.random() * 400 + i * 20 }))
-  },
-  {
-    id: '3',
-    symbol: 'SOL',
-    name: 'Solana',
-    balance: 145.0,
-    price: 148.90,
-    change24h: 5.7,
-    color: 'bg-purple-600',
-    chartData: Array.from({ length: 20 }, (_, i) => ({ value: 130 + Math.random() * 30 + i * 5 }))
-  },
-  {
-    id: '4',
-    symbol: 'USDC',
-    name: 'USD Coin',
-    balance: 5430.0,
-    price: 1.00,
-    change24h: 0.01,
-    color: 'bg-blue-400',
-    chartData: Array.from({ length: 20 }, () => ({ value: 1.00 + (Math.random() - 0.5) * 0.001 }))
-  },
-  {
-    id: '5',
-    symbol: 'DOGE',
-    name: 'Dogecoin',
-    balance: 0,
-    price: 0.12,
-    change24h: 8.4,
-    color: 'bg-yellow-500',
-    chartData: Array.from({ length: 20 }, (_, i) => ({ value: 0.10 + Math.random() * 0.05 }))
-  },
-  {
-    id: '6',
-    symbol: 'DOT',
-    name: 'Polkadot',
-    balance: 0,
-    price: 7.20,
-    change24h: -3.5,
-    color: 'bg-pink-600',
-    chartData: Array.from({ length: 20 }, (_, i) => ({ value: 8 - i * 0.1 + Math.random() }))
-  }
-];
+// Initial state for user portfolio (would be fetched from DB in real app)
+const INITIAL_HOLDINGS: Record<string, number> = {
+    'BTC': 0.42,
+    'ETH': 4.5,
+    'SOL': 145.0,
+    'USDC': 5430.0,
+    'DOGE': 10000,
+    'LINK': 50
+};
 
 const INITIAL_TRANSACTIONS: Transaction[] = [
   { id: 't1', type: 'receive', assetSymbol: 'BTC', amount: 0.0042, valueUsd: 269.76, date: 'Today, 10:23 AM', status: 'completed' },
   { id: 't2', type: 'send', assetSymbol: 'ETH', amount: 1.2, valueUsd: 4140.24, date: 'Yesterday, 4:15 PM', status: 'completed' },
   { id: 't3', type: 'swap', assetSymbol: 'SOL', amount: 45, valueUsd: 6700.50, date: 'Oct 24, 9:30 AM', status: 'completed' },
   { id: 't4', type: 'buy', assetSymbol: 'USDC', amount: 500, valueUsd: 500.00, date: 'Oct 22, 2:10 PM', status: 'completed' },
-  { id: 't5', type: 'receive', assetSymbol: 'DOGE', amount: 1000, valueUsd: 120.00, date: 'Oct 20, 11:00 AM', status: 'completed' },
 ];
 
 function App() {
   const [currentView, setCurrentView] = useState<ViewState>(ViewState.WELCOME);
-  const [assets] = useState<Asset[]>(INITIAL_ASSETS);
+  const [assets, setAssets] = useState<Asset[]>([]);
+  const [rawMarketData, setRawMarketData] = useState<Asset[]>([]);
+  const [userHoldings, setUserHoldings] = useState<Record<string, number>>(INITIAL_HOLDINGS);
+  const [transactions, setTransactions] = useState<Transaction[]>(INITIAL_TRANSACTIONS);
+  
   const [totalBalance, setTotalBalance] = useState(0);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [activeChatIsGroup, setActiveChatIsGroup] = useState(false);
   const [pendingAppRequest, setPendingAppRequest] = useState<Partial<ConnectedApp> | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
+  const [selectedNFT, setSelectedNFT] = useState<NFT | null>(null);
+  
+  // AI Context State
+  const [aiPrompt, setAiPrompt] = useState<string | undefined>(undefined);
+
+  // Merge Market Data with User Holdings
+  const updateAssets = (marketData: Asset[], holdings: Record<string, number>) => {
+      const mergedAssets = marketData.map(asset => ({
+          ...asset,
+          balance: holdings[asset.symbol] || 0
+      }));
+
+      // Sort: User assets first, then by market cap
+      mergedAssets.sort((a, b) => {
+          const balanceA = a.balance * a.price;
+          const balanceB = b.balance * b.price;
+          return balanceB - balanceA;
+      });
+
+      setAssets(mergedAssets);
+  };
+
+  // Load Live Crypto Data
+  const loadMarketData = async () => {
+      setIsRefreshing(true);
+      const liveAssets = await cryptoService.getMarketData();
+      setRawMarketData(liveAssets);
+      updateAssets(liveAssets, userHoldings);
+      setIsRefreshing(false);
+  };
 
   useEffect(() => {
-    const user = authService.getCurrentUser();
-    if (user) {
-      setCurrentUser(user);
-      setCurrentView(ViewState.HOME);
-    }
-    setIsInitialized(true);
+    loadMarketData();
+    const interval = setInterval(loadMarketData, 60000);
+
+    // Auth Subscription
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+        if (session?.user) {
+            const profile = await authService._ensureUserProfile(session.user.id, session.user.email || '');
+            setCurrentUser(profile);
+            if ([ViewState.WELCOME, ViewState.LOGIN, ViewState.SIGNUP].includes(currentView)) {
+                setCurrentView(ViewState.HOME);
+            }
+        } else {
+            setCurrentUser(null);
+            setCurrentView(ViewState.WELCOME);
+        }
+        setIsInitialized(true);
+    });
+
+    authService.getCurrentUser().then(user => {
+        if (user) {
+            setCurrentUser(user);
+            setCurrentView(ViewState.HOME);
+        }
+        setIsInitialized(true);
+    });
+
+    return () => {
+        clearInterval(interval);
+        subscription.unsubscribe();
+    };
   }, []);
 
+  // Recalculate total when assets change
   useEffect(() => {
     const total = assets.reduce((acc, asset) => acc + (asset.balance * asset.price), 0);
     setTotalBalance(total);
@@ -121,8 +138,8 @@ function App() {
     setCurrentView(ViewState.HOME);
   };
 
-  const handleLogout = () => {
-    authService.logout();
+  const handleLogout = async () => {
+    await authService.logout();
     setCurrentUser(null);
     setCurrentView(ViewState.WELCOME);
   };
@@ -138,94 +155,197 @@ function App() {
     setCurrentView(ViewState.CONNECT_REQUEST);
   };
 
-  // Don't render until we check for session
-  if (!isInitialized) return null;
+  const handleAssetSelect = (assetId: string) => {
+      setSelectedAssetId(assetId);
+      setCurrentView(ViewState.ASSET_DETAILS);
+  };
+  
+  // Unified navigation handler to catch params
+  const handleNavigate = (view: ViewState, params?: any) => {
+      if (view === ViewState.NFT_DETAILS && params?.nft) {
+          setSelectedNFT(params.nft);
+      }
+      setCurrentView(view);
+  };
+
+  const handleAskAI = (prompt: string) => {
+      setAiPrompt(prompt);
+      setCurrentView(ViewState.ADVISOR);
+  };
+
+  const handleTransaction = (type: 'send' | 'receive', amount: number, symbol: string) => {
+      const newHoldings = { ...userHoldings };
+      const currentBalance = newHoldings[symbol] || 0;
+
+      if (type === 'send') {
+          if (currentBalance < amount) {
+             alert('Insufficient Funds');
+             return;
+          }
+          newHoldings[symbol] = currentBalance - amount;
+      } else {
+          newHoldings[symbol] = currentBalance + amount;
+      }
+
+      setUserHoldings(newHoldings);
+      updateAssets(rawMarketData, newHoldings);
+
+      const assetPrice = rawMarketData.find(a => a.symbol === symbol)?.price || 0;
+
+      const newTx: Transaction = {
+          id: 'tx_' + Date.now(),
+          type: type,
+          assetSymbol: symbol,
+          amount: amount,
+          valueUsd: amount * assetPrice,
+          date: 'Just now',
+          status: 'completed'
+      };
+
+      setTransactions(prev => [newTx, ...prev]);
+      setCurrentView(ViewState.WALLET);
+  };
+
+  const handleSwap = (fromSymbol: string, fromAmount: number, toSymbol: string, toAmount: number) => {
+      const newHoldings = { ...userHoldings };
+      
+      // Deduct From
+      if ((newHoldings[fromSymbol] || 0) < fromAmount) {
+         alert('Insufficient Balance');
+         return;
+      }
+      newHoldings[fromSymbol] = (newHoldings[fromSymbol] || 0) - fromAmount;
+      
+      // Add To
+      newHoldings[toSymbol] = (newHoldings[toSymbol] || 0) + toAmount;
+      
+      setUserHoldings(newHoldings);
+      updateAssets(rawMarketData, newHoldings);
+      
+      const fromAssetPrice = rawMarketData.find(a => a.symbol === fromSymbol)?.price || 0;
+
+      const newTx: Transaction = {
+          id: 'tx_swap_' + Date.now(),
+          type: 'swap',
+          assetSymbol: fromSymbol, // Primary asset listed
+          amount: fromAmount,
+          valueUsd: fromAmount * fromAssetPrice,
+          date: 'Just now',
+          status: 'completed'
+      };
+      
+      setTransactions(prev => [newTx, ...prev]);
+      setCurrentView(ViewState.WALLET);
+  };
+
+  if (!isInitialized) return <div className="flex-1 bg-black flex items-center justify-center text-white">Loading...</div>;
 
   const renderContent = () => {
     switch (currentView) {
-      // Auth Views
-      case ViewState.WELCOME:
-        return <Welcome onNavigate={setCurrentView} />;
-      case ViewState.LOGIN:
-        return <Login onNavigate={setCurrentView} onLoginSuccess={handleLoginSuccess} />;
-      case ViewState.SIGNUP:
-        return <Signup onNavigate={setCurrentView} onSignupSuccess={handleLoginSuccess} />;
+      case ViewState.WELCOME: return <Welcome onNavigate={setCurrentView} />;
+      case ViewState.LOGIN: return <Login onNavigate={setCurrentView} onLoginSuccess={handleLoginSuccess} />;
+      case ViewState.SIGNUP: return <Signup onNavigate={setCurrentView} onSignupSuccess={handleLoginSuccess} />;
       
-      // App Views
-      case ViewState.HOME:
-        return <Home assets={assets.filter(a => a.balance > 0)} totalBalance={totalBalance} user={currentUser} onLogout={handleLogout} />;
-      case ViewState.MARKET:
-        return <Market assets={assets} />;
-      case ViewState.ADVISOR:
-        return <Advisor assets={assets} />;
-      case ViewState.WALLET:
-        return <Wallet transactions={INITIAL_TRANSACTIONS} assets={assets} />;
-      case ViewState.DARK_BROWSER:
-        return <DarkBrowser />;
+      case ViewState.HOME: 
+         return <Home 
+            assets={assets.filter(a => a.balance > 0)} 
+            totalBalance={totalBalance} 
+            user={currentUser} 
+            onLogout={handleLogout} 
+            isRefreshing={isRefreshing} 
+            onRefresh={loadMarketData}
+            onAssetClick={handleAssetSelect}
+            onNavigate={handleNavigate}
+         />;
       
-      // Messaging
-      case ViewState.MESSAGES:
-        return currentUser ? <Messages user={currentUser} onNavigate={setCurrentView} onSelectChat={handleChatSelect} /> : null;
-      case ViewState.CHAT:
-        return currentUser && activeChatId ? (
-          <Chat 
-            currentUser={currentUser} 
-            targetId={activeChatId}
-            isGroup={activeChatIsGroup}
-            onBack={() => setCurrentView(ViewState.MESSAGES)} 
-          />
-        ) : <Messages user={currentUser!} onNavigate={setCurrentView} onSelectChat={handleChatSelect} />;
+      case ViewState.MARKET: return <Market assets={assets} />;
+      
+      case ViewState.ADVISOR: 
+          return <Advisor 
+              assets={assets.filter(a => a.balance > 0)} 
+              user={currentUser}
+              initialPrompt={aiPrompt}
+              onNavigate={setCurrentView}
+          />;
+      
+      case ViewState.WALLET: return <Wallet transactions={transactions} assets={assets} />;
+      
+      case ViewState.ASSET_DETAILS: 
+         return selectedAssetId 
+            ? <AssetDetails 
+                asset={assets.find(a => a.id === selectedAssetId) || assets[0]} 
+                onBack={() => setCurrentView(ViewState.HOME)}
+                onSend={() => setCurrentView(ViewState.SEND)}
+                onReceive={() => setCurrentView(ViewState.RECEIVE)}
+                onAskAI={handleAskAI}
+                transactions={transactions.filter(t => t.assetSymbol === (assets.find(a => a.id === selectedAssetId)?.symbol))}
+              /> 
+            : null;
 
-      // Profile Ecosystem
-      case ViewState.PROFILE:
-        return currentUser ? <Profile user={currentUser} onNavigate={setCurrentView} onLogout={handleLogout} onUpdateUser={setCurrentUser} /> : null;
-      case ViewState.SETTINGS:
-        return currentUser ? <Settings user={currentUser} onNavigate={setCurrentView} onUpdateUser={setCurrentUser} /> : null;
-      case ViewState.AFFILIATE:
-        return currentUser ? <Affiliate user={currentUser} onNavigate={setCurrentView} /> : null;
-      case ViewState.NEWS:
-        return <News onNavigate={setCurrentView} />;
-      case ViewState.CONNECTED_APPS:
-        return currentUser ? (
-          <ConnectedApps 
-            user={currentUser} 
-            onNavigate={setCurrentView} 
-            onUpdateUser={setCurrentUser} 
-            onSimulateRequest={handleSimulateAppRequest}
-          />
-        ) : null;
-      case ViewState.CONNECT_REQUEST:
-        return currentUser && pendingAppRequest ? (
-          <ConnectRequest 
-            user={currentUser} 
-            requestData={pendingAppRequest} 
-            onNavigate={setCurrentView} 
-            onUpdateUser={setCurrentUser}
-          />
-        ) : <Home assets={assets} totalBalance={totalBalance} user={currentUser} onLogout={handleLogout} />;
+      case ViewState.NFT_DETAILS:
+          return selectedNFT 
+            ? <NFTDetails 
+                nft={selectedNFT}
+                onBack={() => setCurrentView(ViewState.HOME)}
+                onSend={() => alert('Send NFT Feature (Coming Soon)')}
+              />
+            : null;
 
-      default:
-        return <Home assets={assets} totalBalance={totalBalance} user={currentUser} onLogout={handleLogout} />;
+      case ViewState.SEND:
+         return <Transfer 
+             type="send" 
+             assets={assets.filter(a => a.balance > 0)} 
+             onBack={() => setCurrentView(ViewState.HOME)}
+             onSuccess={handleTransaction}
+             preSelectedAssetId={selectedAssetId}
+         />;
+
+      case ViewState.RECEIVE:
+         return <Transfer 
+             type="receive" 
+             assets={assets} 
+             onBack={() => setCurrentView(ViewState.HOME)}
+             onSuccess={handleTransaction}
+             preSelectedAssetId={selectedAssetId}
+         />;
+
+      case ViewState.SWAP:
+         return <Swap 
+            assets={assets} 
+            onBack={() => setCurrentView(ViewState.HOME)}
+            onSwap={handleSwap}
+         />;
+
+      case ViewState.DARK_BROWSER: return <DarkBrowser />;
+      case ViewState.MESSAGES: return currentUser ? <Messages user={currentUser} onNavigate={setCurrentView} onSelectChat={handleChatSelect} /> : null;
+      case ViewState.CHAT: return currentUser && activeChatId ? <Chat currentUser={currentUser} targetId={activeChatId} isGroup={activeChatIsGroup} onBack={() => setCurrentView(ViewState.MESSAGES)} /> : null;
+      case ViewState.PROFILE: return currentUser ? <Profile user={currentUser} onNavigate={setCurrentView} onLogout={handleLogout} onUpdateUser={setCurrentUser} /> : null;
+      case ViewState.SETTINGS: return currentUser ? <Settings user={currentUser} onNavigate={setCurrentView} onUpdateUser={setCurrentUser} /> : null;
+      case ViewState.AFFILIATE: return currentUser ? <Affiliate user={currentUser} onNavigate={setCurrentView} /> : null;
+      case ViewState.NEWS: return <News onNavigate={setCurrentView} />;
+      case ViewState.CONNECTED_APPS: return currentUser ? <ConnectedApps user={currentUser} onNavigate={setCurrentView} onUpdateUser={setCurrentUser} onSimulateRequest={handleSimulateAppRequest} /> : null;
+      case ViewState.CONNECT_REQUEST: return currentUser && pendingAppRequest ? <ConnectRequest user={currentUser} requestData={pendingAppRequest} onNavigate={setCurrentView} onUpdateUser={setCurrentUser} /> : null;
+      case ViewState.SECURITY: return currentUser ? <Security user={currentUser} onNavigate={setCurrentView} onUpdateUser={setCurrentUser} /> : null;
+      case ViewState.LEGAL: return currentUser ? <Legal user={currentUser} onNavigate={setCurrentView} onUpdateUser={setCurrentUser} /> : null;
+      case ViewState.NOTIFICATIONS: return <Notifications onNavigate={setCurrentView} />;
+      case ViewState.SUPPORT: return <Support onNavigate={setCurrentView} />;
+      default: return <Home assets={assets} totalBalance={totalBalance} user={currentUser} onLogout={handleLogout} />;
     }
   };
 
   return (
-    <div className="bg-background min-h-screen text-white font-sans selection:bg-indigo-500 selection:text-white">
-      <div className="max-w-md mx-auto min-h-screen bg-gradient-to-b from-slate-900 to-black relative shadow-2xl shadow-black">
-        {/* Main Content Area */}
-        <div className="h-screen overflow-y-auto overflow-x-hidden no-scrollbar">
+    <SafeAreaView className="bg-black">
+      <StatusBar barStyle="light-content" />
+      <View className="flex-1 relative max-w-md mx-auto w-full h-full bg-background overflow-hidden shadow-2xl shadow-black">
+        <View className="flex-1 h-full">
           {renderContent()}
-        </div>
-
-        {/* Bottom Navigation - Only show when logged in and not in auth views */}
+        </View>
         {currentUser && 
-         currentView !== ViewState.WELCOME && 
-         currentView !== ViewState.LOGIN && 
-         currentView !== ViewState.SIGNUP && (
+         ![ViewState.WELCOME, ViewState.LOGIN, ViewState.SIGNUP, ViewState.ASSET_DETAILS, ViewState.NFT_DETAILS, ViewState.SEND, ViewState.RECEIVE, ViewState.SWAP, ViewState.CHAT].includes(currentView) && (
            <Navigation currentView={currentView} onNavigate={setCurrentView} />
         )}
-      </div>
-    </div>
+      </View>
+    </SafeAreaView>
   );
 }
 
