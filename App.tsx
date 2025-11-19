@@ -1,11 +1,24 @@
+
 import React, { useState, useEffect } from 'react';
-import { ViewState, Asset, Transaction } from './types';
+import { ViewState, Asset, Transaction, User, ConnectedApp } from './types';
 import { Navigation } from './components/Navigation';
 import { Home } from './views/Home';
 import { Market } from './views/Market';
 import { Advisor } from './views/Advisor';
-import { Card } from './components/ui/Card';
-import { ArrowUpRight, ArrowDownLeft, RefreshCw, Plus, Search, Filter } from 'lucide-react';
+import { Wallet } from './views/Wallet';
+import { Welcome } from './views/Welcome';
+import { Login } from './views/Login';
+import { Signup } from './views/Signup';
+import { Profile } from './views/Profile';
+import { Settings } from './views/Settings';
+import { Affiliate } from './views/Affiliate';
+import { News } from './views/News';
+import { Messages } from './views/Messages';
+import { Chat } from './views/Chat';
+import { DarkBrowser } from './views/DarkBrowser';
+import { ConnectedApps } from './views/ConnectedApps';
+import { ConnectRequest } from './views/ConnectRequest';
+import { authService } from './services/authService';
 
 // Mock Data
 const INITIAL_ASSETS: Asset[] = [
@@ -80,101 +93,119 @@ const INITIAL_TRANSACTIONS: Transaction[] = [
 ];
 
 function App() {
-  const [currentView, setCurrentView] = useState<ViewState>(ViewState.HOME);
+  const [currentView, setCurrentView] = useState<ViewState>(ViewState.WELCOME);
   const [assets] = useState<Asset[]>(INITIAL_ASSETS);
   const [totalBalance, setTotalBalance] = useState(0);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
+  const [activeChatId, setActiveChatId] = useState<string | null>(null);
+  const [activeChatIsGroup, setActiveChatIsGroup] = useState(false);
+  const [pendingAppRequest, setPendingAppRequest] = useState<Partial<ConnectedApp> | null>(null);
+
+  useEffect(() => {
+    const user = authService.getCurrentUser();
+    if (user) {
+      setCurrentUser(user);
+      setCurrentView(ViewState.HOME);
+    }
+    setIsInitialized(true);
+  }, []);
 
   useEffect(() => {
     const total = assets.reduce((acc, asset) => acc + (asset.balance * asset.price), 0);
     setTotalBalance(total);
   }, [assets]);
 
+  const handleLoginSuccess = (user: User) => {
+    setCurrentUser(user);
+    setCurrentView(ViewState.HOME);
+  };
+
+  const handleLogout = () => {
+    authService.logout();
+    setCurrentUser(null);
+    setCurrentView(ViewState.WELCOME);
+  };
+
+  const handleChatSelect = (id: string, isGroup: boolean) => {
+    setActiveChatId(id);
+    setActiveChatIsGroup(isGroup);
+    setCurrentView(ViewState.CHAT);
+  };
+
+  const handleSimulateAppRequest = (request: Partial<ConnectedApp>) => {
+    setPendingAppRequest(request);
+    setCurrentView(ViewState.CONNECT_REQUEST);
+  };
+
+  // Don't render until we check for session
+  if (!isInitialized) return null;
+
   const renderContent = () => {
     switch (currentView) {
+      // Auth Views
+      case ViewState.WELCOME:
+        return <Welcome onNavigate={setCurrentView} />;
+      case ViewState.LOGIN:
+        return <Login onNavigate={setCurrentView} onLoginSuccess={handleLoginSuccess} />;
+      case ViewState.SIGNUP:
+        return <Signup onNavigate={setCurrentView} onSignupSuccess={handleLoginSuccess} />;
+      
+      // App Views
       case ViewState.HOME:
-        return <Home assets={assets.filter(a => a.balance > 0)} totalBalance={totalBalance} />;
+        return <Home assets={assets.filter(a => a.balance > 0)} totalBalance={totalBalance} user={currentUser} onLogout={handleLogout} />;
       case ViewState.MARKET:
         return <Market assets={assets} />;
       case ViewState.ADVISOR:
         return <Advisor assets={assets} />;
       case ViewState.WALLET:
-        return (
-          <div className="p-5 space-y-6 pb-24 animate-in fade-in duration-500">
-             <div className="flex items-center justify-between mt-4">
-                <h1 className="text-2xl font-bold">History</h1>
-                <div className="flex gap-2">
-                   <button className="p-2 rounded-lg bg-surface border border-white/10 text-slate-400 hover:text-white active:bg-surface/80 transition-colors">
-                      <Search size={18} />
-                   </button>
-                   <button className="p-2 rounded-lg bg-surface border border-white/10 text-slate-400 hover:text-white active:bg-surface/80 transition-colors">
-                      <Filter size={18} />
-                   </button>
-                </div>
-             </div>
+        return <Wallet transactions={INITIAL_TRANSACTIONS} assets={assets} />;
+      case ViewState.DARK_BROWSER:
+        return <DarkBrowser />;
+      
+      // Messaging
+      case ViewState.MESSAGES:
+        return currentUser ? <Messages user={currentUser} onNavigate={setCurrentView} onSelectChat={handleChatSelect} /> : null;
+      case ViewState.CHAT:
+        return currentUser && activeChatId ? (
+          <Chat 
+            currentUser={currentUser} 
+            targetId={activeChatId}
+            isGroup={activeChatIsGroup}
+            onBack={() => setCurrentView(ViewState.MESSAGES)} 
+          />
+        ) : <Messages user={currentUser!} onNavigate={setCurrentView} onSelectChat={handleChatSelect} />;
 
-             <div className="space-y-3">
-                {INITIAL_TRANSACTIONS.map((tx) => {
-                   let Icon = ArrowUpRight;
-                   let colorClass = 'bg-slate-700';
-                   let textClass = 'text-white';
-                   let sign = '';
-                   let label = '';
+      // Profile Ecosystem
+      case ViewState.PROFILE:
+        return currentUser ? <Profile user={currentUser} onNavigate={setCurrentView} onLogout={handleLogout} onUpdateUser={setCurrentUser} /> : null;
+      case ViewState.SETTINGS:
+        return currentUser ? <Settings user={currentUser} onNavigate={setCurrentView} onUpdateUser={setCurrentUser} /> : null;
+      case ViewState.AFFILIATE:
+        return currentUser ? <Affiliate user={currentUser} onNavigate={setCurrentView} /> : null;
+      case ViewState.NEWS:
+        return <News onNavigate={setCurrentView} />;
+      case ViewState.CONNECTED_APPS:
+        return currentUser ? (
+          <ConnectedApps 
+            user={currentUser} 
+            onNavigate={setCurrentView} 
+            onUpdateUser={setCurrentUser} 
+            onSimulateRequest={handleSimulateAppRequest}
+          />
+        ) : null;
+      case ViewState.CONNECT_REQUEST:
+        return currentUser && pendingAppRequest ? (
+          <ConnectRequest 
+            user={currentUser} 
+            requestData={pendingAppRequest} 
+            onNavigate={setCurrentView} 
+            onUpdateUser={setCurrentUser}
+          />
+        ) : <Home assets={assets} totalBalance={totalBalance} user={currentUser} onLogout={handleLogout} />;
 
-                   switch (tx.type) {
-                      case 'receive':
-                         Icon = ArrowDownLeft;
-                         colorClass = 'bg-emerald-500/20 text-emerald-400';
-                         textClass = 'text-emerald-400';
-                         sign = '+';
-                         label = 'Received';
-                         break;
-                      case 'send':
-                         Icon = ArrowUpRight;
-                         colorClass = 'bg-surface text-slate-300 border border-white/10';
-                         textClass = 'text-white';
-                         sign = '-';
-                         label = 'Sent';
-                         break;
-                      case 'swap':
-                         Icon = RefreshCw;
-                         colorClass = 'bg-indigo-500/20 text-indigo-400';
-                         textClass = 'text-white';
-                         label = 'Swapped';
-                         break;
-                      case 'buy':
-                         Icon = Plus;
-                         colorClass = 'bg-blue-500/20 text-blue-400';
-                         textClass = 'text-blue-400';
-                         sign = '+';
-                         label = 'Bought';
-                         break;
-                   }
-
-                   return (
-                      <Card key={tx.id} className="flex items-center justify-between p-4">
-                         <div className="flex items-center gap-4">
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${colorClass}`}>
-                               <Icon size={18} />
-                            </div>
-                            <div>
-                               <div className="font-bold text-sm text-white">{label} {tx.assetSymbol}</div>
-                               <div className="text-xs text-slate-400">{tx.date}</div>
-                            </div>
-                         </div>
-                         <div className="text-right">
-                            <div className={`font-bold text-sm ${textClass}`}>
-                               {sign}{tx.amount.toLocaleString()} {tx.assetSymbol}
-                            </div>
-                            <div className="text-xs text-slate-500">${tx.valueUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                         </div>
-                      </Card>
-                   )
-                })}
-             </div>
-          </div>
-        );
       default:
-        return <Home assets={assets} totalBalance={totalBalance} />;
+        return <Home assets={assets} totalBalance={totalBalance} user={currentUser} onLogout={handleLogout} />;
     }
   };
 
@@ -186,8 +217,13 @@ function App() {
           {renderContent()}
         </div>
 
-        {/* Bottom Navigation */}
-        <Navigation currentView={currentView} onNavigate={setCurrentView} />
+        {/* Bottom Navigation - Only show when logged in and not in auth views */}
+        {currentUser && 
+         currentView !== ViewState.WELCOME && 
+         currentView !== ViewState.LOGIN && 
+         currentView !== ViewState.SIGNUP && (
+           <Navigation currentView={currentView} onNavigate={setCurrentView} />
+        )}
       </div>
     </div>
   );

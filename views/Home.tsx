@@ -1,20 +1,35 @@
 import React from 'react';
-import { Asset, Transaction } from '../types';
+import { Asset, User } from '../types';
 import { Card } from '../components/ui/Card';
-import { ArrowUpRight, ArrowDownLeft, RefreshCw, Plus, Wallet } from 'lucide-react';
+import { ArrowUpRight, ArrowDownLeft, ArrowLeftRight, CreditCard, Wallet, LogOut } from 'lucide-react';
 import { AreaChart, Area, ResponsiveContainer } from 'recharts';
 
 interface HomeProps {
   assets: Asset[];
   totalBalance: number;
+  user: User | null;
+  onLogout: () => void;
 }
 
-export const Home: React.FC<HomeProps> = ({ assets, totalBalance }) => {
+export const Home: React.FC<HomeProps> = ({ assets, totalBalance, user, onLogout }) => {
   return (
     <div className="p-5 space-y-6 pb-24 animate-in fade-in duration-500">
       {/* Header / Total Balance */}
-      <div className="space-y-1 mt-4">
-        <span className="text-slate-400 text-sm font-medium">Total Balance</span>
+      <div className="space-y-1 mt-4 relative">
+        <div className="flex justify-between items-start">
+           <span className="text-slate-400 text-sm font-medium">
+              Welcome back, {user?.name.split(' ')[0]}
+           </span>
+           <button 
+             onClick={onLogout}
+             className="p-2 bg-surface rounded-full text-slate-400 hover:text-red-400 transition-colors"
+             title="Logout"
+           >
+             <LogOut size={16} />
+           </button>
+        </div>
+        
+        <span className="text-slate-400 text-sm font-medium block">Total Balance</span>
         <h1 className="text-4xl font-bold text-white tracking-tight">
           ${totalBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </h1>
@@ -29,8 +44,8 @@ export const Home: React.FC<HomeProps> = ({ assets, totalBalance }) => {
         {[
           { icon: ArrowUpRight, label: 'Send', color: 'bg-indigo-500' },
           { icon: ArrowDownLeft, label: 'Receive', color: 'bg-slate-700' },
-          { icon: RefreshCw, label: 'Swap', color: 'bg-slate-700' },
-          { icon: Plus, label: 'Buy', color: 'bg-slate-700' },
+          { icon: ArrowLeftRight, label: 'Swap', color: 'bg-slate-700' },
+          { icon: CreditCard, label: 'Buy', color: 'bg-slate-700' },
         ].map((action, i) => (
           <button key={i} className="flex flex-col items-center gap-2 group">
             <div className={`w-14 h-14 rounded-2xl ${action.color} flex items-center justify-center shadow-lg shadow-indigo-500/20 group-active:scale-95 transition-transform`}>
